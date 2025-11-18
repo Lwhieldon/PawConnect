@@ -253,80 +253,138 @@ def format_match_explanation(
     return explanation, key_factors, concerns
 
 
-def parse_petfinder_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
-    Parse Petfinder API response into standardized format.
+    Parse RescueGroups API response into standardized format.
 
     Args:
-        data: Raw Petfinder API response
+        data: Raw RescueGroups API response
 
     Returns:
         List of normalized pet data dictionaries
     """
     pets = []
 
-    for animal in data.get("animals", []):
+    # RescueGroups v5 API returns data in 'data' array
+    animals = data.get("data", [])
+    included = data.get("included", [])  # Contains related org data
+
+    # Build organization lookup
+    orgs = {}
+    for item in included:
+        if item.get("type") == "orgs":
+            org_id = item.get("id")
+            attrs = item.get("attributes", {})
+            orgs[org_id] = attrs
+
+    for animal_obj in animals:
         try:
+            if animal_obj.get("type") != "animals":
+                continue
+
+            animal = animal_obj.get("attributes", {})
+            animal_id = animal_obj.get("id")
+
+            # Get organization data
+            org_relationship = animal_obj.get("relationships", {}).get("orgs", {}).get("data", [])
+            org_id = org_relationship[0].get("id") if org_relationship else None
+            org_data = orgs.get(org_id, {}) if org_id else {}
+
             # Extract photo URLs
             photos = []
-            for photo in animal.get("photos", []):
-                photos.append({
-                    "url": photo.get("full", photo.get("large", photo.get("medium"))),
-                    "small": photo.get("small"),
-                    "medium": photo.get("medium"),
-                    "large": photo.get("large"),
-                    "full": photo.get("full"),
-                })
+            pictures = animal.get("animalPictures", [])
+            if isinstance(pictures, list):
+                for photo in pictures:
+                    if isinstance(photo, dict):
+                        photo_url = photo.get("large", {}).get("url") or photo.get("original", {}).get("url")
+                        if photo_url:
+                            photos.append({
+                                "url": photo_url,
+                                "small": photo.get("small", {}).get("url"),
+                                "medium": photo.get("medium", {}).get("url"),
+                                "large": photo.get("large", {}).get("url"),
+                                "full": photo.get("original", {}).get("url"),
+                            })
 
             # Extract shelter information
-            org = animal.get("organization_id", "")
-            contact = animal.get("contact", {})
-            address = contact.get("address", {})
-
             shelter = {
-                "organization_id": org,
-                "name": animal.get("organization_name", "Unknown Shelter"),
-                "email": contact.get("email"),
-                "phone": contact.get("phone"),
-                "address": address.get("address1"),
-                "city": address.get("city", "Unknown"),
-                "state": address.get("state", "XX"),
-                "zip_code": address.get("postcode", "00000"),
+                "organization_id": org_id or "unknown",
+                "name": org_data.get("orgName", "Unknown Shelter"),
+                "email": org_data.get("orgEmail"),
+                "phone": org_data.get("orgPhone"),
+                "address": org_data.get("orgAddress"),
+                "city": org_data.get("orgCity", "Unknown"),
+                "state": org_data.get("orgState", "XX"),
+                "zip_code": org_data.get("orgPostalcode", "00000"),
             }
+
+            # Parse coordinates if available
+            coords = animal.get("animalLocationCoordinates")
+            if coords and isinstance(coords, dict):
+                shelter["latitude"] = coords.get("lat")
+                shelter["longitude"] = coords.get("lon")
 
             # Extract attributes
             attributes = {
-                "good_with_children": animal.get("environment", {}).get("children"),
-                "good_with_dogs": animal.get("environment", {}).get("dogs"),
-                "good_with_cats": animal.get("environment", {}).get("cats"),
-                "house_trained": animal.get("attributes", {}).get("house_trained", False),
-                "declawed": animal.get("attributes", {}).get("declawed", False),
-                "spayed_neutered": animal.get("attributes", {}).get("spayed_neutered", False),
-                "special_needs": animal.get("attributes", {}).get("special_needs", False),
-                "shots_current": animal.get("attributes", {}).get("shots_current", True),
+                "good_with_children": animal.get("animalOKWithKids"),
+                "good_with_dogs": animal.get("animalOKWithDogs"),
+                "good_with_cats": animal.get("animalOKWithCats"),
+                "house_trained": animal.get("animalHousetrained", False),
+                "declawed": False,  # RescueGroups doesn't have this field
+                "spayed_neutered": animal.get("animalAltered", False),
+                "special_needs": animal.get("animalSpecialneeds", False),
+                "shots_current": True,  # Assume true if not specified
             }
+
+            # Map size to our format
+            size_map = {
+                "S": "small",
+                "M": "medium",
+                "L": "large",
+                "XL": "extra_large"
+            }
+            size_raw = animal.get("animalGeneralSizePotential", "M")
+            size = size_map.get(size_raw, "medium")
+
+            # Map age to our format
+            age_raw = animal.get("animalAge", "Adult")
+            age_map = {
+                "Baby": "baby",
+                "Young": "young",
+                "Adult": "adult",
+                "Senior": "senior"
+            }
+            age = age_map.get(age_raw, "adult")
+
+            # Map gender
+            gender_map = {
+                "Male": "male",
+                "Female": "female",
+                "Unknown": "unknown"
+            }
+            gender = gender_map.get(animal.get("animalSex", "Unknown"), "unknown")
 
             # Build pet data
             pet_data = {
-                "pet_id": f"pf_{animal['id']}",
-                "external_id": str(animal["id"]),
-                "name": animal.get("name", "Unknown"),
-                "species": animal.get("type", "dog").lower(),
-                "breed": animal.get("breeds", {}).get("primary"),
-                "mixed_breed": animal.get("breeds", {}).get("mixed", False),
-                "secondary_breed": animal.get("breeds", {}).get("secondary"),
-                "age": animal.get("age", "adult").lower(),
-                "size": animal.get("size", "medium").lower(),
-                "gender": animal.get("gender", "unknown").lower(),
-                "color": animal.get("colors", {}).get("primary"),
-                "coat": animal.get("coat"),
+                "pet_id": f"rg_{animal_id}",
+                "external_id": str(animal_id),
+                "name": animal.get("animalName", "Unknown"),
+                "species": animal.get("animalSpecies", "Dog").lower(),
+                "breed": animal.get("animalPrimaryBreed") or animal.get("animalBreed"),
+                "mixed_breed": bool(animal.get("animalSecondaryBreed")),
+                "secondary_breed": animal.get("animalSecondaryBreed"),
+                "age": age,
+                "size": size,
+                "gender": gender,
+                "color": animal.get("animalColor"),
+                "coat": None,  # RescueGroups doesn't provide coat length
                 "attributes": attributes,
-                "description": animal.get("description", ""),
+                "description": animal.get("animalDescription", ""),
                 "photos": photos,
                 "primary_photo_url": photos[0]["url"] if photos else None,
                 "shelter": shelter,
-                "status": animal.get("status", "adoptable").lower(),
-                "published_at": animal.get("published_at"),
+                "status": "available",  # Assuming all returned pets are available
+                "published_at": animal.get("animalUpdatedDate"),
             }
 
             pets.append(pet_data)

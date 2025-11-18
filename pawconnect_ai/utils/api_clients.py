@@ -1,6 +1,6 @@
 """
 External API clients for PawConnect AI.
-Handles communication with Petfinder, Google Cloud services, and other external APIs.
+Handles communication with RescueGroups, Google Cloud services, and other external APIs.
 """
 
 import asyncio
@@ -38,45 +38,24 @@ class RateLimiter:
         self.calls.append(now)
 
 
-class PetfinderClient:
-    """Client for Petfinder API v2."""
+class RescueGroupsClient:
+    """Client for RescueGroups API v5."""
 
     def __init__(
         self,
         api_key: Optional[str] = None,
-        api_secret: Optional[str] = None,
         base_url: Optional[str] = None,
     ):
-        self.api_key = api_key or settings.petfinder_api_key
-        self.api_secret = api_secret or settings.petfinder_api_secret
-        self.base_url = base_url or settings.petfinder_base_url
-        self.token: Optional[str] = None
-        self.token_expires_at: float = 0
+        self.api_key = api_key or settings.rescuegroups_api_key
+        self.base_url = base_url or settings.rescuegroups_base_url
         self.rate_limiter = RateLimiter(settings.api_rate_limit)
 
-    def _get_token(self) -> str:
-        """Get or refresh OAuth token."""
-        if self.token and time.time() < self.token_expires_at:
-            return self.token
-
-        logger.info("Fetching new Petfinder API token")
-        response = requests.post(
-            f"{self.base_url}/oauth2/token",
-            data={
-                "grant_type": "client_credentials",
-                "client_id": self.api_key,
-                "client_secret": self.api_secret,
-            },
-            timeout=settings.api_timeout,
-        )
-        response.raise_for_status()
-        data = response.json()
-
-        self.token = data["access_token"]
-        # Set expiration to 5 minutes before actual expiry for safety
-        self.token_expires_at = time.time() + data["expires_in"] - 300
-
-        return self.token
+    def _get_headers(self) -> Dict[str, str]:
+        """Get API request headers with authentication."""
+        return {
+            "Authorization": self.api_key,
+            "Content-Type": "application/vnd.api+json",
+        }
 
     async def search_pets(
         self,
@@ -88,7 +67,7 @@ class PetfinderClient:
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Search for pets on Petfinder.
+        Search for pets on RescueGroups.
 
         Args:
             pet_type: Type of pet (dog, cat, etc.)
@@ -99,33 +78,59 @@ class PetfinderClient:
             **kwargs: Additional search parameters
 
         Returns:
-            Search results from Petfinder API
+            Search results from RescueGroups API
         """
         await self.rate_limiter.acquire()
 
-        token = self._get_token()
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = self._get_headers()
 
-        params = {
-            "limit": min(limit, 100),  # Petfinder max is 100
-            "page": page,
-        }
+        # Build RescueGroups API v5 request body
+        filters = []
 
         if pet_type:
-            params["type"] = pet_type
-        if location:
-            params["location"] = location
-        if distance:
-            params["distance"] = distance
+            filters.append({
+                "fieldName": "animals.species",
+                "operation": "equal",
+                "criteria": pet_type.capitalize()
+            })
 
-        # Add any additional parameters
-        params.update(kwargs)
+        if location:
+            # RescueGroups uses postal code for location filtering
+            filters.append({
+                "fieldName": "animals.location",
+                "operation": "radius",
+                "criteria": location,
+                "radius": distance
+            })
+
+        request_body = {
+            "data": {
+                "filters": filters,
+                "filterProcessing": "1",  # Use AND logic
+                "fields": {
+                    "animals": [
+                        "animalName", "animalSpecies", "animalBreed",
+                        "animalPrimaryBreed", "animalSecondaryBreed",
+                        "animalAge", "animalSex", "animalGeneralSizePotential",
+                        "animalColor", "animalDescription", "animalPictures",
+                        "animalLocation", "animalLocationCitystate",
+                        "animalLocationPostalcode", "animalLocationCoordinates",
+                        "animalOKWithCats", "animalOKWithDogs", "animalOKWithKids",
+                        "animalHousetrained", "animalAltered", "animalSpecialneeds",
+                        "animalStatus", "animalUpdatedDate"
+                    ],
+                    "orgs": ["orgName", "orgEmail", "orgPhone", "orgAddress", "orgCity", "orgState", "orgPostalcode"]
+                },
+                "limit": str(min(limit, 250)),  # RescueGroups max is 250
+                "page": str(page)
+            }
+        }
 
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{self.base_url}/animals",
+            async with session.post(
+                f"{self.base_url}/public/animals/search/available",
                 headers=headers,
-                params=params,
+                json=request_body,
                 timeout=aiohttp.ClientTimeout(total=settings.api_timeout),
             ) as response:
                 response.raise_for_status()
@@ -135,13 +140,37 @@ class PetfinderClient:
         """Get details for a specific pet."""
         await self.rate_limiter.acquire()
 
-        token = self._get_token()
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = self._get_headers()
+
+        request_body = {
+            "data": {
+                "filters": [{
+                    "fieldName": "animals.id",
+                    "operation": "equal",
+                    "criteria": pet_id
+                }],
+                "fields": {
+                    "animals": [
+                        "animalName", "animalSpecies", "animalBreed",
+                        "animalPrimaryBreed", "animalSecondaryBreed",
+                        "animalAge", "animalSex", "animalGeneralSizePotential",
+                        "animalColor", "animalDescription", "animalPictures",
+                        "animalLocation", "animalLocationCitystate",
+                        "animalLocationPostalcode", "animalLocationCoordinates",
+                        "animalOKWithCats", "animalOKWithDogs", "animalOKWithKids",
+                        "animalHousetrained", "animalAltered", "animalSpecialneeds",
+                        "animalStatus", "animalUpdatedDate"
+                    ],
+                    "orgs": ["orgName", "orgEmail", "orgPhone", "orgAddress", "orgCity", "orgState", "orgPostalcode"]
+                }
+            }
+        }
 
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{self.base_url}/animals/{pet_id}",
+            async with session.post(
+                f"{self.base_url}/public/animals/search",
                 headers=headers,
+                json=request_body,
                 timeout=aiohttp.ClientTimeout(total=settings.api_timeout),
             ) as response:
                 response.raise_for_status()
@@ -153,18 +182,35 @@ class PetfinderClient:
         """Search for organizations/shelters."""
         await self.rate_limiter.acquire()
 
-        token = self._get_token()
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = self._get_headers()
 
-        params = {"limit": min(limit, 100)}
+        filters = []
         if location:
-            params["location"] = location
+            filters.append({
+                "fieldName": "orgs.postalcode",
+                "operation": "equal",
+                "criteria": location
+            })
+
+        request_body = {
+            "data": {
+                "filters": filters if filters else [],
+                "fields": {
+                    "orgs": [
+                        "orgName", "orgEmail", "orgPhone", "orgWebsite",
+                        "orgAddress", "orgCity", "orgState", "orgPostalcode",
+                        "orgCountry"
+                    ]
+                },
+                "limit": str(min(limit, 250))
+            }
+        }
 
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{self.base_url}/organizations",
+            async with session.post(
+                f"{self.base_url}/public/orgs/search",
                 headers=headers,
-                params=params,
+                json=request_body,
                 timeout=aiohttp.ClientTimeout(total=settings.api_timeout),
             ) as response:
                 response.raise_for_status()
@@ -328,5 +374,5 @@ class GoogleCloudClient:
 
 
 # Singleton instances
-petfinder_client = PetfinderClient()
+rescuegroups_client = RescueGroupsClient()
 google_cloud_client = GoogleCloudClient()

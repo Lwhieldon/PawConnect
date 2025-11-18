@@ -30,12 +30,11 @@ class Settings(BaseSettings):
     gcp_region: str = Field(default="us-central1", description="GCP Region")
     gcp_credentials_path: Optional[str] = Field(default=None, description="Path to GCP credentials JSON")
 
-    # Petfinder API
-    petfinder_api_key: str = Field(default="", description="Petfinder API Key")
-    petfinder_api_secret: str = Field(default="", description="Petfinder API Secret")
-    petfinder_base_url: str = Field(
-        default="https://api.petfinder.com/v2",
-        description="Petfinder API base URL"
+    # RescueGroups API
+    rescuegroups_api_key: str = Field(default="", description="RescueGroups API Key")
+    rescuegroups_base_url: str = Field(
+        default="https://api.rescuegroups.org/v5",
+        description="RescueGroups API base URL"
     )
 
     # Dialogflow CX

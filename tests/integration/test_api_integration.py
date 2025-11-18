@@ -6,25 +6,25 @@ import pytest
 import asyncio
 from unittest.mock import Mock, patch, AsyncMock
 
-from pawconnect_ai.utils.api_clients import PetfinderClient, GoogleCloudClient
+from pawconnect_ai.utils.api_clients import RescueGroupsClient, GoogleCloudClient
 from pawconnect_ai.sub_agents.pet_search_agent import PetSearchAgent
 from pawconnect_ai.sub_agents.vision_agent import VisionAgent
 from pawconnect_ai.config import settings
 
 
-class TestPetfinderIntegration:
-    """Integration tests for Petfinder API client."""
+class TestRescueGroupsIntegration:
+    """Integration tests for RescueGroups API client."""
 
     @pytest.fixture
-    def petfinder_client(self):
-        """Create a Petfinder client for testing."""
+    def rescuegroups_client(self):
+        """Create a RescueGroups client for testing."""
         # Use mock APIs in testing
         settings.mock_apis = True
-        return PetfinderClient()
+        return RescueGroupsClient()
 
     @pytest.mark.asyncio
-    async def test_search_pets_integration(self, petfinder_client):
-        """Test searching for pets through Petfinder API."""
+    async def test_search_pets_integration(self, rescuegroups_client):
+        """Test searching for pets through RescueGroups API."""
         # This test uses mock data since we can't hit real API in CI
         search_agent = PetSearchAgent()
 
@@ -46,7 +46,7 @@ class TestPetfinderIntegration:
         assert hasattr(pet, "shelter")
 
     @pytest.mark.asyncio
-    async def test_search_with_filters(self, petfinder_client):
+    async def test_search_with_filters(self, rescuegroups_client):
         """Test pet search with various filters."""
         search_agent = PetSearchAgent()
 
@@ -63,7 +63,7 @@ class TestPetfinderIntegration:
             assert all(pet.species.value == "cat" for pet in cats)
 
     @pytest.mark.asyncio
-    async def test_get_pet_by_id(self, petfinder_client):
+    async def test_get_pet_by_id(self, rescuegroups_client):
         """Test retrieving a specific pet by ID."""
         search_agent = PetSearchAgent()
 

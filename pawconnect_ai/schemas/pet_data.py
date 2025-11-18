@@ -155,7 +155,7 @@ class Pet(BaseModel):
     pet_id: str = Field(..., description="Unique pet identifier")
     external_id: Optional[str] = Field(
         default=None,
-        description="External system ID (e.g., Petfinder ID)"
+        description="External system ID (e.g., RescueGroups ID)"
     )
 
     # Basic information

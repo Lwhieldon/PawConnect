@@ -9,8 +9,8 @@ from loguru import logger
 
 from ..config import settings
 from ..schemas.pet_data import Pet
-from ..utils.api_clients import petfinder_client
-from ..utils.helpers import parse_petfinder_response
+from ..utils.api_clients import rescuegroups_client
+from ..utils.helpers import parse_rescuegroups_response
 from ..utils.validators import validate_search_params
 
 
@@ -21,7 +21,7 @@ class PetSearchAgent:
 
     def __init__(self):
         """Initialize the pet search agent."""
-        self.petfinder = petfinder_client
+        self.rescuegroups = rescuegroups_client
         self.cache = {}  # Simple in-memory cache
 
     async def search_pets(
@@ -63,8 +63,8 @@ class PetSearchAgent:
                 f"distance={distance}, limit={limit}"
             )
 
-            # Search Petfinder API
-            pets = await self._search_petfinder(
+            # Search RescueGroups API
+            pets = await self._search_rescuegroups(
                 pet_type=pet_type,
                 location=location,
                 distance=distance,
@@ -82,7 +82,7 @@ class PetSearchAgent:
             logger.error(f"Error searching for pets: {e}")
             return []
 
-    async def _search_petfinder(
+    async def _search_rescuegroups(
         self,
         pet_type: Optional[str] = None,
         location: Optional[str] = None,
@@ -90,10 +90,10 @@ class PetSearchAgent:
         limit: int = 100,
         **kwargs
     ) -> List[Pet]:
-        """Search Petfinder API for pets."""
+        """Search RescueGroups API for pets."""
         try:
             # Make API request
-            response = await self.petfinder.search_pets(
+            response = await self.rescuegroups.search_pets(
                 pet_type=pet_type,
                 location=location,
                 distance=distance,
@@ -102,7 +102,7 @@ class PetSearchAgent:
             )
 
             # Parse response into Pet objects
-            pet_data_list = parse_petfinder_response(response)
+            pet_data_list = parse_rescuegroups_response(response)
 
             pets = []
             for pet_data in pet_data_list:
@@ -116,7 +116,7 @@ class PetSearchAgent:
             return pets
 
         except Exception as e:
-            logger.error(f"Petfinder API error: {e}")
+            logger.error(f"RescueGroups API error: {e}")
             # Return mock data in case of error if in testing mode
             if settings.testing_mode or settings.mock_apis:
                 return self._get_mock_pets(pet_type, limit)
@@ -248,12 +248,12 @@ class PetSearchAgent:
                 return None
 
             # Extract external ID if it's a prefixed ID
-            external_id = pet_id.replace("pf_", "")
+            external_id = pet_id.replace("rg_", "")
 
-            response = await self.petfinder.get_pet(external_id)
+            response = await self.rescuegroups.get_pet(external_id)
 
             # Parse response
-            pet_data_list = parse_petfinder_response({"animals": [response.get("animal", {})]})
+            pet_data_list = parse_rescuegroups_response(response)
 
             if pet_data_list:
                 return Pet(**pet_data_list[0])

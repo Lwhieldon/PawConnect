@@ -46,7 +46,7 @@ The main agent serves as the orchestration layer, managing user context, routing
 
 #### 1. **`pet_search_agent`** - Data Retrieval Specialist
 
-- **Purpose**: Queries multiple data sources (Petfinder API, local shelter databases, Google Sheets) to fetch available pets based on location and basic filters.
+- **Purpose**: Queries multiple data sources (RescueGroups API, local shelter databases, Google Sheets) to fetch available pets based on location and basic filters.
 
 - **Implementation**: Uses `LoopAgent` pattern to handle multiple API endpoints with retry logic and rate limiting. Publishes results to Pub/Sub topic for downstream processing.
 
@@ -115,7 +115,7 @@ The agent system leverages custom tools and Google Cloud services:
 1. **`fetch_shelter_data`**: Async tool that queries multiple shelter APIs concurrently
    - Handles authentication tokens and API key rotation
    - Implements exponential backoff for failed requests
-   - Normalizes data from different shelter management systems (PetPoint, ShelterLuv, RescueGroups)
+   - Normalizes data from different shelter management systems (RescueGroups, ShelterLuv, PetPoint)
 
 2. **`calculate_compatibility_score`**: Vertex AI model invocation wrapper
    - Prepares feature vectors from user profile and pet attributes
@@ -178,7 +178,7 @@ Each step builds upon the previous, creating a seamless journey from first inter
 - Google Cloud Platform account with billing enabled
 - Google Cloud SDK (`gcloud` CLI) installed
 - API keys for:
-  - Petfinder API (https://www.petfinder.com/developers/)
+  - RescueGroups API (https://rescuegroups.org/services/adoptable-pet-data-api/)
   - Google Cloud services (Vision, Dialogflow, Vertex AI)
 
 ### Google Cloud Setup
@@ -238,8 +238,7 @@ GCP_PROJECT_ID=your_project_id
 GCP_REGION=your_region
 
 # APIs
-PETFINDER_API_KEY=your_petfinder_key
-PETFINDER_API_SECRET=your_petfinder_secret
+RESCUEGROUPS_API_KEY=your_rescuegroups_api_key
 
 # Dialogflow
 DIALOGFLOW_AGENT_ID=your_agent_id
@@ -482,7 +481,7 @@ This project was developed as part of the Kaggle Agents Intensive Capstone. Spec
 
 - **Kaggle & Competition Organizers** for the learning opportunity and platform
 - **agent-shutton Sample Submission** for architectural inspiration on multi-agent orchestration
-- **Petfinder API** for providing comprehensive shelter data access
+- **RescueGroups.org** for providing comprehensive shelter data access through their API
 - **Google Cloud Team** for extensive AI/ML toolkit documentation
 - **Open-source communities**: TensorFlow, FastAPI, and pytest contributors
 
@@ -492,7 +491,7 @@ This project was developed as part of the Kaggle Agents Intensive Capstone. Spec
 2. **Recommendation Systems**: Collaborative Filtering and Content-Based Hybrid Models (Aggarwal, 2016)
 3. **Dialogflow CX Best Practices**: Google Cloud Documentation
 4. **Vertex AI Model Deployment**: Google Cloud AI Platform guides
-5. **Pet Adoption Data**: ASPCA and Petfinder datasets for model training
+5. **Pet Adoption Data**: ASPCA and RescueGroups datasets for model training
 
 ## License
 
