@@ -148,6 +148,8 @@ env.bak/
 venv.bak/
 credentials/gcp-key.json
 credentials/
+docs\DIALOGFLOW_QUICK_START.md
+docs\DIALOGFLOW_SETUP.md
 
 # Spyder project settings
 .spyderproject

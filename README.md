@@ -36,6 +36,159 @@ This automation transforms pet adoption from a time-consuming manual search into
 
 PawConnect AI is built around a central orchestrator, the **`pawconnect_main_agent`**, which coordinates an ecosystem of five specialized sub-agents using event-driven communication via Google Cloud Pub/Sub.
 
+### Modular Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          USER INTERFACE LAYER                                │
+│                  (Web App / Mobile App / Voice Assistant)                    │
+└────────────────────────────────┬────────────────────────────────────────────┘
+                                 │
+                                 ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        DIALOGFLOW CX AGENT                                   │
+│                    (Natural Language Understanding)                          │
+│  Tools: Intent Detection, Entity Extraction, Context Management             │
+└────────────────────────────────┬────────────────────────────────────────────┘
+                                 │ Webhook
+                                 ▼
+╔═════════════════════════════════════════════════════════════════════════════╗
+║                    PAWCONNECT MAIN AGENT (Orchestrator)                     ║
+║                         pawconnect_ai/agent.py                              ║
+║                                                                              ║
+║  Tools:                                                                      ║
+║  • Session Management          • Request Routing                            ║
+║  • Context Aggregation         • Error Handling                             ║
+║  • Response Formatting         • Logging & Monitoring                       ║
+╚════════════════┬═══════════┬══════════┬═══════════┬═════════════════════════╝
+                 │           │          │           │
+       ┌─────────┴───┐   ┌───┴────┐ ┌──┴─────┐ ┌──┴──────┐
+       ▼             ▼   ▼        ▼ ▼        ▼ ▼         ▼
+┌─────────────┐ ┌────────────┐ ┌──────────┐ ┌────────────┐ ┌──────────────┐
+│   Pet       │ │ Recommend- │ │ Conver-  │ │  Vision    │ │  Workflow    │
+│   Search    │ │   ation    │ │ sation   │ │  Agent     │ │   Agent      │
+│   Agent     │ │   Agent    │ │  Agent   │ │            │ │              │
+└─────┬───────┘ └─────┬──────┘ └────┬─────┘ └─────┬──────┘ └──────┬───────┘
+      │               │              │             │                │
+      │ Tools:        │ Tools:       │ Tools:      │ Tools:         │ Tools:
+      │ • API Client  │ • ML Model   │ • Intent    │ • Vision API   │ • Firestore
+      │ • Validator   │ • Scoring    │   Detector  │ • Custom       │ • Pub/Sub
+      │ • Parser      │ • Ranker     │ • Entity    │   Models       │ • Scheduler
+      │ • Cache Mgr   │ • Explainer  │   Extract   │ • Image        │ • Validator
+      │               │ • Filter     │ • Response  │   Processor    │ • Notifier
+      │               │              │   Builder   │                │
+      ▼               ▼              ▼             ▼                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         UTILITY MODULES & TOOLS                              │
+│                         pawconnect_ai/utils/                                 │
+│                                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
+│  │  api_clients.py  │  │   validators.py  │  │    helpers.py    │         │
+│  │                  │  │                  │  │                  │         │
+│  │ • RescueGroups   │  │ • Input Valid.   │  │ • Distance Calc  │         │
+│  │   Client         │  │ • Schema Valid.  │  │ • Score Format   │         │
+│  │ • GCP Client     │  │ • Search Params  │  │ • Response Parse │         │
+│  │ • Rate Limiter   │  │ • Data Sanitize  │  │ • Time Utils     │         │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘         │
+└─────────────────────────────────────────────────────────────────────────────┘
+      │               │              │             │                │
+      ▼               ▼              ▼             ▼                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    EXTERNAL SERVICES & DATA LAYER                            │
+│                                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │ RescueGroups │  │  Vertex AI   │  │ Cloud Vision │  │  Firestore   │  │
+│  │     API      │  │    Model     │  │     API      │  │   Database   │  │
+│  │              │  │              │  │              │  │              │  │
+│  │ Pet Data     │  │ Predictions  │  │ Breed ID     │  │ User Profiles│  │
+│  │ Shelter Info │  │ Rankings     │  │ Age Est.     │  │ Applications │  │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  │
+│                                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │  Pub/Sub     │  │ Memorystore  │  │ Cloud        │  │   Secret     │  │
+│  │  Topics      │  │   (Redis)    │  │  Storage     │  │   Manager    │  │
+│  │              │  │              │  │              │  │              │  │
+│  │ Event Queue  │  │ Cache Layer  │  │ Model Store  │  │ API Keys     │  │
+│  │ Async Comm.  │  │ Session Data │  │ Images       │  │ Credentials  │  │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                              DATA FLOW PATTERNS
+
+    Synchronous Flow:          Async/Event-Driven:       Caching Layer:
+    User → Agent → Tool        Agent → Pub/Sub → Agent   Tool → Redis → API
+         ↓                           ↓                         ↓
+      Response                    Subscribe                  Cache Hit
+                                     ↓                         ↓
+                                  Process                   Return
+```
+
+### Component Interaction Flow
+
+**1. Search Flow:**
+```
+User Request → Dialogflow CX → Main Agent → Pet Search Agent
+                                               ↓
+                                    ┌──────────┴──────────┐
+                                    ↓                     ↓
+                              API Client            Validator
+                                    ↓                     ↓
+                             RescueGroups API      Check Cache
+                                    ↓                     ↓
+                                Parser ←──────────── Helper
+                                    ↓
+                              Pet Objects → Main Agent → User
+```
+
+**2. Recommendation Flow:**
+```
+User Preferences → Main Agent → Pet Search Agent → Get Available Pets
+                                       ↓
+                              Recommendation Agent
+                                       ↓
+                          ┌────────────┴────────────┐
+                          ↓                         ↓
+                    ML Model (Vertex AI)      Scoring Tools
+                          ↓                         ↓
+                    Predictions              Calculate Scores
+                          ↓                         ↓
+                          └────────────┬────────────┘
+                                       ↓
+                                  Ranked Matches → User
+```
+
+**3. Vision Analysis Flow:**
+```
+Pet Image → Vision Agent → Image Processor
+                              ↓
+                    ┌─────────┴──────────┐
+                    ↓                    ↓
+            Cloud Vision API      Custom Models
+                    ↓                    ↓
+            General Features      Breed/Age Detection
+                    ↓                    ↓
+                    └─────────┬──────────┘
+                              ↓
+                      Vision Analysis → Main Agent
+```
+
+**4. Application Workflow:**
+```
+Submit Application → Main Agent → Workflow Agent
+                                        ↓
+                            ┌───────────┴──────────┐
+                            ↓                      ↓
+                      Validator              Firestore
+                            ↓                      ↓
+                      Check Data            Store Application
+                            ↓                      ↓
+                       Pub/Sub ──────→ Background Check Service
+                            ↓                      ↓
+                    Schedule Visit           Update Status
+                            ↓                      ↓
+                    Send Notification ←──────── Email/SMS
+```
+
 ### Primary Agent: `pawconnect_main_agent`
 
 The main agent serves as the orchestration layer, managing user context, routing requests to specialized sub-agents, and maintaining conversation state. It ensures coherent multi-turn interactions and handles fallback scenarios when sub-agents encounter errors.
@@ -312,61 +465,79 @@ pytest --cov=pawconnect_ai --cov-report=html
 ## Project Structure
 
 ```
-.
-├── pawconnect_ai/
+PawConnect/
+├── pawconnect_ai/                 # Core application package
 │   ├── __init__.py
-│   ├── agent.py                    # Main orchestrator agent
-│   ├── config.py                   # Configuration management
-│   ├── tools.py                    # Custom tool implementations
-│   ├── sub_agents/
+│   ├── agent.py                   # Main orchestrator agent
+│   ├── config.py                  # Configuration management
+│   ├── tools.py                   # Custom tool implementations
+│   │
+│   ├── sub_agents/                # Specialized sub-agents
 │   │   ├── __init__.py
-│   │   ├── pet_search_agent.py    # Shelter API integration
-│   │   ├── recommendation_agent.py # ML-based ranking
-│   │   ├── conversation_agent.py   # Dialogflow CX handler
-│   │   ├── vision_agent.py        # Image analysis
-│   │   └── workflow_agent.py      # Application processing
-│   ├── models/
-│   │   ├── recommendation_model.py # TensorFlow model definition
-│   │   └── breed_classifier.py    # Custom Vision model
-│   ├── utils/
-│   │   ├── api_clients.py         # External API wrappers
-│   │   ├── validators.py          # Input validation
-│   │   └── helpers.py             # Utility functions
-│   └── schemas/
-│       ├── user_profile.py        # Pydantic models
-│       └── pet_data.py
-├── tests/
+│   │   ├── pet_search_agent.py   # RescueGroups API integration
+│   │   ├── recommendation_agent.py # ML-based pet matching
+│   │   ├── conversation_agent.py  # Dialogflow CX handler
+│   │   ├── vision_agent.py       # Image analysis (Cloud Vision)
+│   │   └── workflow_agent.py     # Application processing
+│   │
+│   ├── models/                    # ML model definitions
+│   │   ├── __init__.py
+│   │   ├── recommendation_model.py # TensorFlow recommendation model
+│   │   └── breed_classifier.py   # Custom breed classification model
+│   │
+│   ├── utils/                     # Utility modules
+│   │   ├── __init__.py
+│   │   ├── api_clients.py        # RescueGroups & GCP API clients
+│   │   ├── validators.py         # Input validation
+│   │   └── helpers.py            # Helper functions & parsers
+│   │
+│   └── schemas/                   # Pydantic data models
+│       ├── __init__.py
+│       ├── user_profile.py       # User profile schemas
+│       └── pet_data.py           # Pet data schemas
+│
+├── tests/                         # Test suite
 │   ├── __init__.py
-│   ├── unit/
+│   ├── test_agent.py             # End-to-end agent tests
+│   │
+│   ├── unit/                      # Unit tests
+│   │   ├── __init__.py
 │   │   ├── test_search_agent.py
 │   │   ├── test_recommendation.py
 │   │   └── test_vision_agent.py
-│   ├── integration/
-│   │   ├── test_api_integration.py
-│   │   └── test_workflow.py
-│   └── test_agent.py              # End-to-end tests
-├── eval/
-│   ├── evaluate_recommendations.py # ML model evaluation
-│   └── test_cases.json            # Sample test scenarios
-├── notebooks/
-│   ├── data_exploration.ipynb     # EDA on shelter data
-│   └── model_training.ipynb       # Recommendation model training
-├── deployment/
-│   ├── Dockerfile
-│   ├── cloudbuild.yaml            # CI/CD configuration
-│   └── terraform/                 # Infrastructure as code
-│       ├── main.tf
-│       ├── variables.tf
-│       └── outputs.tf
-├── docs/
-│   ├── API.md                     # API documentation
-│   ├── DEPLOYMENT.md              # Deployment guide
-│   └── ARCHITECTURE.md            # Detailed architecture
-├── .env.example                    # Environment template
-├── .gitignore
+│   │
+│   └── integration/               # Integration tests
+│       ├── __init__.py
+│       └── test_api_integration.py
+│
+├── eval/                          # Model evaluation
+│   ├── evaluate_recommendations.py # Evaluation script (Precision@K, NDCG)
+│   └── test_cases.json           # Test scenarios for evaluation
+│
+├── notebooks/                     # Jupyter notebooks
+│   ├── data_exploration.ipynb    # EDA on shelter data
+│   └── model_training.ipynb      # Recommendation model training
+│
+├── deployment/                    # Deployment configurations
+│   ├── Dockerfile                # Multi-stage Docker build
+│   ├── cloudbuild.yaml           # Google Cloud Build CI/CD
+│   └── terraform/                # Infrastructure as Code
+│       ├── main.tf               # Main Terraform configuration
+│       ├── variables.tf          # Input variables
+│       └── outputs.tf            # Output values
+│
+├── docs/                          # Documentation
+│   ├── API.md                    # API reference & endpoints
+│   ├── DEPLOYMENT.md             # Deployment guide (GCP)
+│   ├── ARCHITECTURE.md           # System architecture details
+│   ├── DIALOGFLOW_SETUP.md       # Dialogflow CX setup guide
+│   └── DIALOGFLOW_QUICK_START.md # Quick start for Dialogflow
+│
+├── .env.example                   # Environment variables template
 ├── requirements.txt               # Python dependencies
-├── README.md                      # This file
-└── LICENSE                        # Apache-2.0
+├── setup.py                       # Package setup configuration
+├── LICENSE                        # Apache-2.0 License
+└── README.md                      # Project documentation (this file)
 ```
 
 ## Conclusion

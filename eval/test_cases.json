@@ -1,0 +1,155 @@
+[
+  {
+    "test_case_id": 1,
+    "description": "First-time dog owner, apartment living, active lifestyle",
+    "user_profile": {
+      "user_id": "eval_user_001",
+      "email": "test1@example.com",
+      "first_name": "Sarah",
+      "last_name": "Johnson",
+      "city": "Seattle",
+      "state": "WA",
+      "zip_code": "98101",
+      "preferences": {
+        "pet_type": "dog",
+        "home_type": "apartment",
+        "has_yard": false,
+        "has_children": false,
+        "has_other_pets": false,
+        "experience_level": "first_time",
+        "activity_level": "high",
+        "preferred_size": "small",
+        "preferred_age": "adult",
+        "house_trained": true
+      },
+      "is_adopter": true
+    },
+    "relevant_pet_ids": [
+      "mock_001",
+      "mock_004",
+      "mock_007"
+    ]
+  },
+  {
+    "test_case_id": 2,
+    "description": "Experienced cat owner, house with yard, family with kids",
+    "user_profile": {
+      "user_id": "eval_user_002",
+      "email": "test2@example.com",
+      "first_name": "Michael",
+      "last_name": "Chen",
+      "city": "Portland",
+      "state": "OR",
+      "zip_code": "97201",
+      "preferences": {
+        "pet_type": "cat",
+        "home_type": "house",
+        "has_yard": true,
+        "has_children": true,
+        "has_other_pets": false,
+        "experience_level": "experienced",
+        "activity_level": "moderate",
+        "preferred_age": "young"
+      },
+      "is_adopter": true
+    },
+    "relevant_pet_ids": [
+      "mock_002",
+      "mock_005",
+      "mock_008"
+    ]
+  },
+  {
+    "test_case_id": 3,
+    "description": "Senior adopter looking for senior dog, low activity",
+    "user_profile": {
+      "user_id": "eval_user_003",
+      "email": "test3@example.com",
+      "first_name": "Dorothy",
+      "last_name": "Williams",
+      "city": "Tacoma",
+      "state": "WA",
+      "zip_code": "98402",
+      "preferences": {
+        "pet_type": "dog",
+        "home_type": "house",
+        "has_yard": true,
+        "has_children": false,
+        "has_other_pets": false,
+        "experience_level": "experienced",
+        "activity_level": "low",
+        "preferred_size": "medium",
+        "preferred_age": "senior",
+        "house_trained": true,
+        "special_needs_ok": true
+      },
+      "is_adopter": true
+    },
+    "relevant_pet_ids": [
+      "mock_003",
+      "mock_006",
+      "mock_009"
+    ]
+  },
+  {
+    "test_case_id": 4,
+    "description": "Foster parent, experienced with dogs, has other pets",
+    "user_profile": {
+      "user_id": "eval_user_004",
+      "email": "test4@example.com",
+      "first_name": "Jessica",
+      "last_name": "Martinez",
+      "city": "Bellevue",
+      "state": "WA",
+      "zip_code": "98004",
+      "preferences": {
+        "pet_type": "dog",
+        "home_type": "house",
+        "has_yard": true,
+        "has_children": false,
+        "has_other_pets": true,
+        "other_pets": ["dog", "cat"],
+        "experience_level": "experienced",
+        "activity_level": "moderate",
+        "preferred_size": "medium",
+        "special_needs_ok": true
+      },
+      "is_adopter": false,
+      "is_foster": true
+    },
+    "relevant_pet_ids": [
+      "mock_001",
+      "mock_003",
+      "mock_010"
+    ]
+  },
+  {
+    "test_case_id": 5,
+    "description": "Young couple, first-time cat owners, apartment",
+    "user_profile": {
+      "user_id": "eval_user_005",
+      "email": "test5@example.com",
+      "first_name": "Alex",
+      "last_name": "Taylor",
+      "city": "Seattle",
+      "state": "WA",
+      "zip_code": "98102",
+      "preferences": {
+        "pet_type": "cat",
+        "home_type": "apartment",
+        "has_yard": false,
+        "has_children": false,
+        "has_other_pets": false,
+        "experience_level": "first_time",
+        "activity_level": "moderate",
+        "preferred_age": "young"
+      },
+      "is_adopter": true
+    },
+    "relevant_pet_ids": [
+      "mock_002",
+      "mock_005",
+      "mock_011"
+    ]
+  }
+]
