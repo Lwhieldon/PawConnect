@@ -150,6 +150,7 @@ credentials/gcp-key.json
 credentials/
 docs\DIALOGFLOW_QUICK_START.md
 docs\DIALOGFLOW_SETUP.md
+.vscode
 
 # Spyder project settings
 .spyderproject
