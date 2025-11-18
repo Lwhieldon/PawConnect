@@ -1,4 +1,10 @@
-# Project Overview - PawConnect AI 
+# Project Overview - PawConnect AI
+
+<div align="center">
+  <img src="images/PawConnectAI-Logo.png" alt="PawConnect AI Logo" width="400"/>
+</div>
+
+<br/>
 
 This repository contains my submission for the [Kaggle Agents Intensive Capstone Project](https://www.kaggle.com/competitions/agents-intensive-capstone-project). PawConnect AI is a multi-agent system designed to revolutionize pet foster and adoption by intelligently matching pets with potential caregivers through conversational AI, computer vision, and personalized recommendations.
 
@@ -532,6 +538,9 @@ PawConnect/
 │   ├── ARCHITECTURE.md           # System architecture details
 │   ├── DIALOGFLOW_SETUP.md       # Dialogflow CX setup guide
 │   └── DIALOGFLOW_QUICK_START.md # Quick start for Dialogflow
+│
+├── images/                        # Project images & assets
+│   └── PawConnectAI-Logo.png     # Application logo
 │
 ├── .env.example                   # Environment variables template
 ├── requirements.txt               # Python dependencies
