@@ -249,7 +249,12 @@ class PawConnectTools:
         try:
             # Extract search parameters from user preferences
             pet_type = user.preferences.pet_type.value if user.preferences.pet_type else None
-            location = f"{user.city}, {user.state}"
+
+            # Prefer zip code for location filtering, fall back to city/state
+            if user.zip_code and user.zip_code != "00000":
+                location = user.zip_code
+            else:
+                location = f"{user.city}, {user.state}"
 
             # Search for pets
             pets = await self.fetch_shelter_data(

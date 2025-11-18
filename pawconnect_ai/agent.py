@@ -404,7 +404,7 @@ async def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="PawConnect AI Agent")
-    parser.add_argument("--user-location", required=True, help="User location (City, State)")
+    parser.add_argument("--user-location", required=True, help="User location (zip code like '98101' or 'City, State' like 'Seattle, WA')")
     parser.add_argument("--pet-type", default="dog", help="Type of pet (dog, cat, etc.)")
     parser.add_argument("--size", default="medium", help="Pet size preference")
     parser.add_argument("--max-results", type=int, default=10, help="Maximum results")
@@ -417,9 +417,18 @@ async def main():
     # Create a test user profile
     from .schemas.user_profile import UserProfile, UserPreferences, HomeType, ExperienceLevel, PetType, PetSize
 
-    city, state = args.user_location.split(",")
-    city = city.strip()
-    state = state.strip()
+    # Handle both "City, State" and "ZipCode" formats
+    if "," in args.user_location:
+        # City, State format
+        city, state = args.user_location.split(",")
+        city = city.strip()
+        state = state.strip()
+        zip_code = "00000"
+    else:
+        # Zip code format - use placeholder values that pass validation
+        city = "Location"
+        state = "WA"  # Use valid state code as placeholder
+        zip_code = args.user_location.strip()
 
     user_data = {
         "user_id": "test_user_001",
@@ -428,7 +437,7 @@ async def main():
         "last_name": "User",
         "city": city,
         "state": state,
-        "zip_code": "00000",
+        "zip_code": zip_code,
         "preferences": {
             "pet_type": args.pet_type,
             "pet_size": [args.size],

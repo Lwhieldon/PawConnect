@@ -87,52 +87,72 @@ class RescueGroupsClient:
         # Build RescueGroups API v5 request body
         filters = []
 
-        if pet_type:
-            filters.append({
-                "fieldName": "animals.species",
-                "operation": "equal",
-                "criteria": pet_type.capitalize()
-            })
+        # Species is included in the URL path, not as a filter
+        species_path = f"/{pet_type}s" if pet_type else ""
 
         if location:
             # RescueGroups uses postal code for location filtering
-            filters.append({
-                "fieldName": "animals.location",
-                "operation": "radius",
-                "criteria": location,
-                "radius": distance
-            })
+            # Extract zip code from location (if it's "City, State" format, we need to handle it)
+            zip_code = location
+            if "," in location:
+                # If location is "Seattle, WA", we can't use it directly
+                # For now, skip location filter if not a zip code
+                logger.warning(f"Location '{location}' is not a zip code. Skipping location filter. Please provide a 5-digit zip code for location filtering.")
+            else:
+                # Postal code filter
+                filters.append({
+                    "fieldName": "animalLocation",
+                    "operation": "equals",
+                    "criteria": zip_code
+                })
+                # Distance radius filter
+                filters.append({
+                    "fieldName": "animalLocationDistance",
+                    "operation": "radius",
+                    "criteria": str(distance)
+                })
 
+        # Build request body - v5 uses flat structure, not wrapped in "data"
         request_body = {
-            "data": {
-                "filters": filters,
-                "filterProcessing": "1",  # Use AND logic
-                "fields": {
-                    "animals": [
-                        "animalName", "animalSpecies", "animalBreed",
-                        "animalPrimaryBreed", "animalSecondaryBreed",
-                        "animalAge", "animalSex", "animalGeneralSizePotential",
-                        "animalColor", "animalDescription", "animalPictures",
-                        "animalLocation", "animalLocationCitystate",
-                        "animalLocationPostalcode", "animalLocationCoordinates",
-                        "animalOKWithCats", "animalOKWithDogs", "animalOKWithKids",
-                        "animalHousetrained", "animalAltered", "animalSpecialneeds",
-                        "animalStatus", "animalUpdatedDate"
-                    ],
-                    "orgs": ["orgName", "orgEmail", "orgPhone", "orgAddress", "orgCity", "orgState", "orgPostalcode"]
-                },
-                "limit": str(min(limit, 250)),  # RescueGroups max is 250
-                "page": str(page)
-            }
+            "filters": filters,
+            "filterProcessing": "1",  # Use AND logic
+            "fields": {
+                "animals": [
+                    "name", "breedString", "breedPrimary", "breedSecondary",
+                    "ageGroup", "ageString", "birthDate", "sex",
+                    "sizeCurrent", "sizeUOM", "coatLength",
+                    "descriptionText", "descriptionHtml",
+                    "pictureThumbnailUrl", "pictureCount",
+                    "isAdoptionPending", "priority", "rescueId",
+                    "createdDate", "updatedDate"
+                ],
+                "orgs": ["name", "email", "phone", "street", "city", "state", "postalcode", "url"]
+            },
+            "limit": str(min(limit, 250)),  # RescueGroups max is 250
+            "page": str(page)
         }
+
+        # Log request for debugging
+        api_url = f"{self.base_url}/public/animals/search/available{species_path}"
+        logger.debug(f"RescueGroups API URL: {api_url}")
+        logger.debug(f"RescueGroups API request: {request_body}")
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{self.base_url}/public/animals/search/available",
+                api_url,
                 headers=headers,
                 json=request_body,
                 timeout=aiohttp.ClientTimeout(total=settings.api_timeout),
             ) as response:
+                if response.status != 200:
+                    # Get error details
+                    error_text = await response.text()
+                    logger.error(
+                        f"RescueGroups API error: {response.status}, "
+                        f"message='{response.reason}', "
+                        f"url='{response.url}', "
+                        f"response='{error_text}'"
+                    )
                 response.raise_for_status()
                 return await response.json()
 
@@ -143,26 +163,22 @@ class RescueGroupsClient:
         headers = self._get_headers()
 
         request_body = {
-            "data": {
-                "filters": [{
-                    "fieldName": "animals.id",
-                    "operation": "equal",
-                    "criteria": pet_id
-                }],
-                "fields": {
-                    "animals": [
-                        "animalName", "animalSpecies", "animalBreed",
-                        "animalPrimaryBreed", "animalSecondaryBreed",
-                        "animalAge", "animalSex", "animalGeneralSizePotential",
-                        "animalColor", "animalDescription", "animalPictures",
-                        "animalLocation", "animalLocationCitystate",
-                        "animalLocationPostalcode", "animalLocationCoordinates",
-                        "animalOKWithCats", "animalOKWithDogs", "animalOKWithKids",
-                        "animalHousetrained", "animalAltered", "animalSpecialneeds",
-                        "animalStatus", "animalUpdatedDate"
-                    ],
-                    "orgs": ["orgName", "orgEmail", "orgPhone", "orgAddress", "orgCity", "orgState", "orgPostalcode"]
-                }
+            "filters": [{
+                "fieldName": "id",
+                "operation": "equal",
+                "criteria": pet_id
+            }],
+            "fields": {
+                "animals": [
+                    "name", "breedString", "breedPrimary", "breedSecondary",
+                    "ageGroup", "ageString", "birthDate", "sex",
+                    "sizeCurrent", "sizeUOM", "coatLength",
+                    "descriptionText", "descriptionHtml",
+                    "pictureThumbnailUrl", "pictureCount",
+                    "isAdoptionPending", "priority", "rescueId",
+                    "createdDate", "updatedDate"
+                ],
+                "orgs": ["name", "email", "phone", "street", "city", "state", "postalcode", "url"]
             }
         }
 
@@ -187,23 +203,21 @@ class RescueGroupsClient:
         filters = []
         if location:
             filters.append({
-                "fieldName": "orgs.postalcode",
+                "fieldName": "postalcode",
                 "operation": "equal",
                 "criteria": location
             })
 
         request_body = {
-            "data": {
-                "filters": filters if filters else [],
-                "fields": {
-                    "orgs": [
-                        "orgName", "orgEmail", "orgPhone", "orgWebsite",
-                        "orgAddress", "orgCity", "orgState", "orgPostalcode",
-                        "orgCountry"
-                    ]
-                },
-                "limit": str(min(limit, 250))
-            }
+            "filters": filters if filters else [],
+            "fields": {
+                "orgs": [
+                    "name", "email", "phone", "url",
+                    "street", "city", "state", "postalcode",
+                    "country"
+                ]
+            },
+            "limit": str(min(limit, 250))
         }
 
         async with aiohttp.ClientSession() as session:

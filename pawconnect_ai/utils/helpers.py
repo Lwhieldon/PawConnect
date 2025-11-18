@@ -265,6 +265,13 @@ def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     pets = []
 
+    # Debug: Log the structure of the response
+    logger.debug(f"RescueGroups response keys: {data.keys()}")
+    if "data" in data and len(data["data"]) > 0:
+        logger.debug(f"First animal keys: {data['data'][0].keys()}")
+        if "attributes" in data["data"][0]:
+            logger.debug(f"First animal attributes keys: {data['data'][0]['attributes'].keys()}")
+
     # RescueGroups v5 API returns data in 'data' array
     animals = data.get("data", [])
     included = data.get("included", [])  # Contains related org data
@@ -285,74 +292,92 @@ def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
             animal = animal_obj.get("attributes", {})
             animal_id = animal_obj.get("id")
 
-            # Get organization data
-            org_relationship = animal_obj.get("relationships", {}).get("orgs", {}).get("data", [])
-            org_id = org_relationship[0].get("id") if org_relationship else None
+            # Get organization data from relationships
+            org_relationship = animal_obj.get("relationships", {}).get("orgs", {}).get("data")
+            org_id = None
+            if org_relationship:
+                # Handle both single object and array formats
+                if isinstance(org_relationship, list):
+                    org_id = org_relationship[0].get("id") if org_relationship else None
+                elif isinstance(org_relationship, dict):
+                    org_id = org_relationship.get("id")
             org_data = orgs.get(org_id, {}) if org_id else {}
 
-            # Extract photo URLs
+            # Get species from relationships
+            species_relationship = animal_obj.get("relationships", {}).get("species", {}).get("data")
+            species_id = None
+            if species_relationship:
+                # Handle both single object and array formats
+                if isinstance(species_relationship, list):
+                    species_id = species_relationship[0].get("id") if species_relationship else None
+                elif isinstance(species_relationship, dict):
+                    species_id = species_relationship.get("id")
+
+            # Infer species from breed or default to dog
+            species = "dog"  # Default
+            breed_string = animal.get("breedString", "")
+            if "cat" in breed_string.lower():
+                species = "cat"
+
+            # Extract photo URL
             photos = []
-            pictures = animal.get("animalPictures", [])
-            if isinstance(pictures, list):
-                for photo in pictures:
-                    if isinstance(photo, dict):
-                        photo_url = photo.get("large", {}).get("url") or photo.get("original", {}).get("url")
-                        if photo_url:
-                            photos.append({
-                                "url": photo_url,
-                                "small": photo.get("small", {}).get("url"),
-                                "medium": photo.get("medium", {}).get("url"),
-                                "large": photo.get("large", {}).get("url"),
-                                "full": photo.get("original", {}).get("url"),
-                            })
+            thumbnail = animal.get("pictureThumbnailUrl")
+            if thumbnail:
+                photos.append({
+                    "url": thumbnail,
+                    "small": thumbnail,
+                    "medium": thumbnail,
+                    "large": thumbnail,
+                    "full": thumbnail,
+                })
 
             # Extract shelter information
             shelter = {
                 "organization_id": org_id or "unknown",
-                "name": org_data.get("orgName", "Unknown Shelter"),
-                "email": org_data.get("orgEmail"),
-                "phone": org_data.get("orgPhone"),
-                "address": org_data.get("orgAddress"),
-                "city": org_data.get("orgCity", "Unknown"),
-                "state": org_data.get("orgState", "XX"),
-                "zip_code": org_data.get("orgPostalcode", "00000"),
+                "name": org_data.get("name", "Unknown Shelter"),
+                "email": org_data.get("email"),
+                "phone": org_data.get("phone"),
+                "address": org_data.get("street"),
+                "city": org_data.get("city", "Unknown"),
+                "state": org_data.get("state", "XX"),
+                "zip_code": org_data.get("postalcode", "00000"),
             }
 
-            # Parse coordinates if available
-            coords = animal.get("animalLocationCoordinates")
-            if coords and isinstance(coords, dict):
-                shelter["latitude"] = coords.get("lat")
-                shelter["longitude"] = coords.get("lon")
-
-            # Extract attributes
+            # Extract attributes (many fields not available in v5 public API)
+            # Note: Some attributes are not available in the public API, so we use defaults
             attributes = {
-                "good_with_children": animal.get("animalOKWithKids"),
-                "good_with_dogs": animal.get("animalOKWithDogs"),
-                "good_with_cats": animal.get("animalOKWithCats"),
-                "house_trained": animal.get("animalHousetrained", False),
-                "declawed": False,  # RescueGroups doesn't have this field
-                "spayed_neutered": animal.get("animalAltered", False),
-                "special_needs": animal.get("animalSpecialneeds", False),
-                "shots_current": True,  # Assume true if not specified
+                "good_with_children": None,  # Not available in public API (can be None)
+                "good_with_dogs": None,
+                "good_with_cats": None,
+                "house_trained": False,  # Not available, use default
+                "declawed": False,
+                "spayed_neutered": False,  # Not available, use default
+                "special_needs": False,  # Not available, use default
+                "shots_current": True,
+                "energy_level": "moderate"  # Default since not provided
             }
 
             # Map size to our format
+            size_raw = animal.get("sizeCurrent", "Medium")
             size_map = {
-                "S": "small",
-                "M": "medium",
-                "L": "large",
-                "XL": "extra_large"
+                "Small": "small",
+                "Medium": "medium",
+                "Large": "large",
+                "Extra Large": "extra_large",
+                "Puppy": "small",  # Puppies are typically small
+                "Kitten": "small"
             }
-            size_raw = animal.get("animalGeneralSizePotential", "M")
             size = size_map.get(size_raw, "medium")
 
             # Map age to our format
-            age_raw = animal.get("animalAge", "Adult")
+            age_raw = animal.get("ageGroup", "Adult")
             age_map = {
                 "Baby": "baby",
                 "Young": "young",
                 "Adult": "adult",
-                "Senior": "senior"
+                "Senior": "senior",
+                "Puppy": "baby",
+                "Kitten": "baby"
             }
             age = age_map.get(age_raw, "adult")
 
@@ -362,29 +387,32 @@ def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "Female": "female",
                 "Unknown": "unknown"
             }
-            gender = gender_map.get(animal.get("animalSex", "Unknown"), "unknown")
+            gender = gender_map.get(animal.get("sex", "Unknown"), "unknown")
+
+            # Get coat length
+            coat = animal.get("coatLength", "").lower() if animal.get("coatLength") else None
 
             # Build pet data
             pet_data = {
                 "pet_id": f"rg_{animal_id}",
                 "external_id": str(animal_id),
-                "name": animal.get("animalName", "Unknown"),
-                "species": animal.get("animalSpecies", "Dog").lower(),
-                "breed": animal.get("animalPrimaryBreed") or animal.get("animalBreed"),
-                "mixed_breed": bool(animal.get("animalSecondaryBreed")),
-                "secondary_breed": animal.get("animalSecondaryBreed"),
+                "name": animal.get("name", "Unknown"),
+                "species": species,
+                "breed": animal.get("breedPrimary") or animal.get("breedString", "Mixed Breed"),
+                "mixed_breed": bool(animal.get("breedSecondary")),
+                "secondary_breed": animal.get("breedSecondary"),
                 "age": age,
                 "size": size,
                 "gender": gender,
-                "color": animal.get("animalColor"),
-                "coat": None,  # RescueGroups doesn't provide coat length
+                "color": None,  # Not provided in v5 public API
+                "coat": coat,
                 "attributes": attributes,
-                "description": animal.get("animalDescription", ""),
+                "description": animal.get("descriptionText", ""),
                 "photos": photos,
                 "primary_photo_url": photos[0]["url"] if photos else None,
                 "shelter": shelter,
-                "status": "available",  # Assuming all returned pets are available
-                "published_at": animal.get("animalUpdatedDate"),
+                "status": "available" if not animal.get("isAdoptionPending") else "pending",
+                "published_at": animal.get("updatedDate"),
             }
 
             pets.append(pet_data)
