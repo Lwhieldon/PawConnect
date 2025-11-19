@@ -718,7 +718,10 @@ Apache-2.0
 ---
 
 **Competition**: Agents Intensive Capstone Project
+
 **Author**: Lee Whieldon
+
 **Date**: November 2025
+
 **Contact**: [\[Email\]](lwhieldon1@gmail.com) | [\[GitHub Profile\]](https://github.com/Lwhieldon)  | [\[Kaggle Profile\]](https://www.kaggle.com/leewhieldon)
 
