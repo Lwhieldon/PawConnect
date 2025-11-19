@@ -1,0 +1,28 @@
+# Minimal requirements for PawConnect Dialogflow Webhook
+# Only includes dependencies needed for the webhook service
+
+# Core Dependencies
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Web Framework & API
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+aiohttp>=3.9.0
+httpx>=0.25.0
+requests>=2.31.0
+
+# Google Cloud Services (minimal set for webhook)
+google-cloud-firestore>=2.13.0
+google-cloud-vision>=3.5.0
+google-cloud-pubsub>=2.18.0
+
+# Logging
+loguru>=0.7.2
+
+# Data Processing (lightweight)
+numpy>=1.26.0
+
+# Utilities
+python-dateutil>=2.8.2

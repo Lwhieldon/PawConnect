@@ -4,15 +4,25 @@ Handles webhook fulfillment requests from Dialogflow CX including pet ID validat
 """
 
 import asyncio
+import sys
 from typing import Dict, Any, Optional
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from loguru import logger
 from pydantic import BaseModel
 
-from .utils.api_clients import rescuegroups_client
-from .agent import PawConnectMainAgent
-from .schemas.user_profile import UserProfile
+# Configure logging
+logger.remove()  # Remove default handler
+logger.add(sys.stderr, level="INFO")
+
+logger.info("Starting PawConnect Dialogflow Webhook...")
+
+try:
+    from .utils.api_clients import rescuegroups_client
+    logger.info("Successfully imported API clients")
+except Exception as e:
+    logger.error(f"Failed to import API clients: {e}")
+    raise
 
 
 # Initialize FastAPI app
@@ -22,8 +32,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Initialize PawConnect agent
-agent = PawConnectMainAgent()
+logger.info("FastAPI app initialized successfully")
 
 
 class DialogflowRequest(BaseModel):
@@ -44,9 +53,32 @@ class DialogflowResponse(BaseModel):
     pageInfo: Optional[Dict[str, Any]] = None
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Log startup event."""
+    logger.info("Webhook service is starting up...")
+    logger.info("Health check endpoint available at /health")
+    logger.info("Webhook endpoint available at /webhook")
+
+
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {
+        "service": "PawConnect Dialogflow Webhook",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "webhook": "/webhook"
+        }
+    }
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
+    logger.debug("Health check called")
     return {"status": "healthy", "service": "pawconnect-dialogflow-webhook"}
 
 
