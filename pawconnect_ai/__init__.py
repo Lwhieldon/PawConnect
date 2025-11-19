@@ -8,6 +8,7 @@ for intelligent pet matching, conversational AI, computer vision, and workflow a
 __version__ = "1.0.0"
 __author__ = "Lee Whieldon"
 
-from .agent import PawConnectMainAgent
+# Lazy imports to avoid loading heavy dependencies unless explicitly needed
+# from .agent import PawConnectMainAgent
 
-__all__ = ["PawConnectMainAgent"]
+__all__ = []

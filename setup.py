@@ -10,6 +10,7 @@ base_requirements = [
     "python-dotenv>=1.0.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
+    "email-validator>=2.0.0",
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
     "aiohttp>=3.9.0",
