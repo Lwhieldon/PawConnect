@@ -68,7 +68,7 @@ PawConnect AI is built around a central orchestrator, the **`pawconnect_main_age
 ║  • Response Formatting         • Logging & Monitoring                       ║
 ╚════════════════┬═══════════┬══════════┬═══════════┬═════════════════════════╝
                  │           │          │           │
-       ┌─────────┴───┐   ┌───┴────┐ ┌──┴─────┐ ┌──┴──────┐
+       ┌─────────┴───┐   ┌───┴────┐ ┌───┴────┐ ┌────┴────┐
        ▼             ▼   ▼        ▼ ▼        ▼ ▼         ▼
 ┌─────────────┐ ┌────────────┐ ┌──────────┐ ┌────────────┐ ┌──────────────┐
 │   Pet       │ │ Recommend- │ │ Conver-  │ │  Vision    │ │  Workflow    │
@@ -88,35 +88,35 @@ PawConnect AI is built around a central orchestrator, the **`pawconnect_main_age
 │                         UTILITY MODULES & TOOLS                             │
 │                         pawconnect_ai/utils/                                │
 │                                                                             │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
-│  │  api_clients.py  │  │   validators.py  │  │    helpers.py    │         │
-│  │                  │  │                  │  │                  │         │
-│  │ • RescueGroups   │  │ • Input Valid.   │  │ • Distance Calc  │         │
-│  │   Client         │  │ • Schema Valid.  │  │ • Score Format   │         │
-│  │ • GCP Client     │  │ • Search Params  │  │ • Response Parse │         │
-│  │ • Rate Limiter   │  │ • Data Sanitize  │  │ • Time Utils     │         │
-│  └──────────────────┘  └──────────────────┘  └──────────────────┘         │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐           │
+│  │  api_clients.py  │  │   validators.py  │  │    helpers.py    │           │
+│  │                  │  │                  │  │                  │           │
+│  │ • RescueGroups   │  │ • Input Valid.   │  │ • Distance Calc  │           │
+│  │   Client         │  │ • Schema Valid.  │  │ • Score Format   │           │
+│  │ • GCP Client     │  │ • Search Params  │  │ • Response Parse │           │
+│  │ • Rate Limiter   │  │ • Data Sanitize  │  │ • Time Utils     │           │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘           │
 └─────────────────────────────────────────────────────────────────────────────┘
       │               │              │             │                │
       ▼               ▼              ▼             ▼                ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    EXTERNAL SERVICES & DATA LAYER                           │
 │                                                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ RescueGroups │  │  Vertex AI   │  │ Cloud Vision │  │  Firestore   │  │
-│  │     API      │  │    Model     │  │     API      │  │   Database   │  │
-│  │              │  │              │  │              │  │              │  │
-│  │ Pet Data     │  │ Predictions  │  │ Breed ID     │  │ User Profiles│  │
-│  │ Shelter Info │  │ Rankings     │  │ Age Est.     │  │ Applications │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │ RescueGroups │  │  Vertex AI   │  │ Cloud Vision │  │  Firestore   │     │
+│  │     API      │  │    Model     │  │     API      │  │   Database   │     │
+│  │              │  │              │  │              │  │              │     │
+│  │ Pet Data     │  │ Predictions  │  │ Breed ID     │  │ User Profiles│     │
+│  │ Shelter Info │  │ Rankings     │  │ Age Est.     │  │ Applications │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
 │                                                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │  Pub/Sub     │  │ Memorystore  │  │ Cloud        │  │   Secret     │  │
-│  │  Topics      │  │   (Redis)    │  │  Storage     │  │   Manager    │  │
-│  │              │  │              │  │              │  │              │  │
-│  │ Event Queue  │  │ Cache Layer  │  │ Model Store  │  │ API Keys     │  │
-│  │ Async Comm.  │  │ Session Data │  │ Images       │  │ Credentials  │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │  Pub/Sub     │  │ Memorystore  │  │ Cloud        │  │   Secret     │     │
+│  │  Topics      │  │   (Redis)    │  │  Storage     │  │   Manager    │     │
+│  │              │  │              │  │              │  │              │     │
+│  │ Event Queue  │  │ Cache Layer  │  │ Model Store  │  │ API Keys     │     │
+│  │ Async Comm.  │  │ Session Data │  │ Images       │  │ Credentials  │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
 
                               DATA FLOW PATTERNS
