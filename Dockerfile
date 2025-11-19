@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY pawconnect_ai/ ./pawconnect_ai/
 COPY setup.py .
+COPY README.md .
 RUN pip install -e .
 
 # Expose port
