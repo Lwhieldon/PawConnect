@@ -667,11 +667,49 @@ This project was developed as part of the Kaggle Agents Intensive Capstone. Spec
 
 ## References & Resources
 
-1. **Multi-Agent Systems**: *Agent-Shutton Architecture* - Inspired orchestration pattern for specialized sub-agents
-2. **Recommendation Systems**: Collaborative Filtering and Content-Based Hybrid Models (Aggarwal, 2016)
-3. **Dialogflow CX Best Practices**: Google Cloud Documentation
-4. **Vertex AI Model Deployment**: Google Cloud AI Platform guides
-5. **Pet Adoption Data**: ASPCA and RescueGroups datasets for model training
+1. **Multi-Agent Systems**:
+   - [Kaggle Agents Intensive Capstone Project](https://www.kaggle.com/competitions/agents-intensive-capstone-project)
+   - [Agent-Shutton Sample Submission](https://www.kaggle.com/code/sglyon/sample-kaggle-submission-agent-shutton) - Inspired orchestration pattern for specialized sub-agents
+   - [Multi-Agent Systems: A Modern Approach](https://www.multiagent.com/)
+
+2. **Recommendation Systems**:
+   - [Recommender Systems: The Textbook](https://link.springer.com/book/10.1007/978-3-319-29659-3) by Charu C. Aggarwal (2016)
+   - [Collaborative Filtering for Implicit Feedback Datasets](https://yifanhu.net/PUB/cf.pdf) - Hu, Koren, Volinsky (2008)
+   - [Content-Based and Hybrid Recommendation Systems](https://dl.acm.org/doi/10.1145/3530257)
+
+3. **Google Cloud Dialogflow CX**:
+   - [Dialogflow CX Documentation](https://cloud.google.com/dialogflow/cx/docs)
+   - [Dialogflow CX Best Practices](https://cloud.google.com/dialogflow/cx/docs/concept/best-practices)
+   - [Building Conversational Experiences](https://cloud.google.com/dialogflow/cx/docs/concept/basics)
+
+4. **Google Cloud Vertex AI**:
+   - [Vertex AI Documentation](https://cloud.google.com/vertex-ai/docs)
+   - [Model Deployment Guide](https://cloud.google.com/vertex-ai/docs/predictions/getting-predictions)
+   - [Custom Model Training](https://cloud.google.com/vertex-ai/docs/training/custom-training)
+   - [AutoML for Custom Models](https://cloud.google.com/vertex-ai/docs/training-overview#automl)
+
+5. **Google Cloud Vision API**:
+   - [Cloud Vision API Documentation](https://cloud.google.com/vision/docs)
+   - [Label Detection Tutorial](https://cloud.google.com/vision/docs/labels)
+   - [Custom Model Training Guide](https://cloud.google.com/vision/automl/docs)
+
+6. **Pet Adoption Data & APIs**:
+   - [RescueGroups.org API Documentation](https://userguide.rescuegroups.org/display/APIDG/API+Developers+Guide+Home)
+   - [ASPCA Pet Statistics](https://www.aspca.org/helping-people-pets/shelter-intake-and-surrender/pet-statistics)
+   - [PetFinder API](https://www.petfinder.com/developers/)
+   - [Stanford Dogs Dataset](http://vision.stanford.edu/aditya86/ImageNetDogs/)
+
+7. **Development Frameworks & Tools**:
+   - [Google AI Development Kit (ADK)](https://google.github.io/applied-genai-dev-kit/)
+   - [FastAPI Documentation](https://fastapi.tiangolo.com/)
+   - [Pydantic Data Validation](https://docs.pydantic.dev/)
+   - [TensorFlow Recommenders](https://www.tensorflow.org/recommenders)
+   - [pytest Testing Framework](https://docs.pytest.org/)
+
+8. **Research & Articles**:
+   - [Improving Animal Shelter Adoption Rates](https://www.mdpi.com/2076-2615/10/9/1656)
+   - [AI in Animal Welfare](https://www.sciencedirect.com/science/article/pii/S2666389920301884)
+   - [Computer Vision for Animal Recognition](https://arxiv.org/abs/1909.11211)
 
 ## License
 
@@ -682,5 +720,5 @@ Apache-2.0
 **Competition**: Agents Intensive Capstone Project
 **Author**: Lee Whieldon
 **Date**: November 2025
-**Contact**: [\[Email\]] lwhieldon1@gmail.com | [\[GitHub Profile\]] https://github.com/Lwhieldon  | [\[Kaggle Profile\]](https://www.kaggle.com/leewhieldon)
+**Contact**: [\[Email\]](lwhieldon1@gmail.com) | [\[GitHub Profile\]](https://github.com/Lwhieldon)  | [\[Kaggle Profile\]](https://www.kaggle.com/leewhieldon)
 
