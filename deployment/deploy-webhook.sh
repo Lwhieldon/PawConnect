@@ -42,7 +42,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --timeout 60 \
     --max-instances 10 \
     --min-instances 0 \
-    --startup-cpu-boost \
+    --cpu-boost \
     --set-env-vars "GCP_PROJECT_ID=${PROJECT_ID}" \
     --set-env-vars "GCP_REGION=${REGION}" \
     --set-env-vars "RESCUEGROUPS_API_KEY=${RESCUEGROUPS_API_KEY}" \
