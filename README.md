@@ -344,7 +344,7 @@ Each step builds upon the previous, creating a seamless journey from first inter
 
 1. **Create GCP Project**:
 ```bash
-gcloud projects create pawconnect-ai --name="PawConnect AI"
+gcloud projects create pawconnect-ai --name=[Insert Your Project Name Here]
 gcloud config set project pawconnect-ai
 ```
 
