@@ -63,12 +63,24 @@ Find the best match
 ```
 
 **4. schedule_visit**
+
+**With Dynamic Pet ID Validation (Recommended):**
+```
+I want to schedule a visit for pet 12345
+Can I meet pet abc789 tomorrow at 2pm?
+Book an appointment for pet #456
+Schedule a visit to see pet XYZ123
+```
+Parameters: `pet_id`, `date`, `time`
+
+**Note**: For dynamic pet ID validation using RescueGroups API, see [WEBHOOK_SETUP.md](./WEBHOOK_SETUP.md)
+
+**Without Webhook (Basic):**
 ```
 Schedule a visit
 I want to meet this pet
 Book an appointment
 ```
-Parameters: `pet_id`, `date`, `time`
 
 **5. help**
 ```

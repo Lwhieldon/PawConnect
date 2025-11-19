@@ -46,14 +46,14 @@ PawConnect AI is built around a central orchestrator, the **`pawconnect_main_age
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          USER INTERFACE LAYER                                │
-│                  (Web App / Mobile App / Voice Assistant)                    │
+│                          USER INTERFACE LAYER                               │
+│                  (Web App / Mobile App / Voice Assistant)                   │
 └────────────────────────────────┬────────────────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        DIALOGFLOW CX AGENT                                   │
-│                    (Natural Language Understanding)                          │
+│                        DIALOGFLOW CX AGENT                                  │
+│                    (Natural Language Understanding)                         │
 │  Tools: Intent Detection, Entity Extraction, Context Management             │
 └────────────────────────────────┬────────────────────────────────────────────┘
                                  │ Webhook
@@ -61,8 +61,8 @@ PawConnect AI is built around a central orchestrator, the **`pawconnect_main_age
 ╔═════════════════════════════════════════════════════════════════════════════╗
 ║                    PAWCONNECT MAIN AGENT (Orchestrator)                     ║
 ║                         pawconnect_ai/agent.py                              ║
-║                                                                              ║
-║  Tools:                                                                      ║
+║                                                                             ║
+║  Tools:                                                                     ║
 ║  • Session Management          • Request Routing                            ║
 ║  • Context Aggregation         • Error Handling                             ║
 ║  • Response Formatting         • Logging & Monitoring                       ║
@@ -75,19 +75,19 @@ PawConnect AI is built around a central orchestrator, the **`pawconnect_main_age
 │   Search    │ │   ation    │ │ sation   │ │  Agent     │ │   Agent      │
 │   Agent     │ │   Agent    │ │  Agent   │ │            │ │              │
 └─────┬───────┘ └─────┬──────┘ └────┬─────┘ └─────┬──────┘ └──────┬───────┘
-      │               │              │             │                │
-      │ Tools:        │ Tools:       │ Tools:      │ Tools:         │ Tools:
-      │ • API Client  │ • ML Model   │ • Intent    │ • Vision API   │ • Firestore
-      │ • Validator   │ • Scoring    │   Detector  │ • Custom       │ • Pub/Sub
-      │ • Parser      │ • Ranker     │ • Entity    │   Models       │ • Scheduler
-      │ • Cache Mgr   │ • Explainer  │   Extract   │ • Image        │ • Validator
-      │               │ • Filter     │ • Response  │   Processor    │ • Notifier
-      │               │              │   Builder   │                │
-      ▼               ▼              ▼             ▼                ▼
+      │               │             │             │               │
+      │ Tools:        │ Tools:      │ Tools:      │ Tools:        │ Tools:
+      │ • API Client  │ • ML Model  │ • Intent    │ • Vision API  │ • Firestore
+      │ • Validator   │ • Scoring   │   Detector  │ • Custom      │ • Pub/Sub
+      │ • Parser      │ • Ranker    │ • Entity    │   Models      │ • Scheduler
+      │ • Cache Mgr   │ • Explainer │   Extract   │ • Image       │ • Validator
+      │               │ • Filter    │ • Response  │   Processor   │ • Notifier
+      │               │             │   Builder   │               │
+      ▼               ▼             ▼             ▼               ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         UTILITY MODULES & TOOLS                              │
-│                         pawconnect_ai/utils/                                 │
-│                                                                              │
+│                         UTILITY MODULES & TOOLS                             │
+│                         pawconnect_ai/utils/                                │
+│                                                                             │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
 │  │  api_clients.py  │  │   validators.py  │  │    helpers.py    │         │
 │  │                  │  │                  │  │                  │         │
@@ -100,8 +100,8 @@ PawConnect AI is built around a central orchestrator, the **`pawconnect_main_age
       │               │              │             │                │
       ▼               ▼              ▼             ▼                ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    EXTERNAL SERVICES & DATA LAYER                            │
-│                                                                              │
+│                    EXTERNAL SERVICES & DATA LAYER                           │
+│                                                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
 │  │ RescueGroups │  │  Vertex AI   │  │ Cloud Vision │  │  Firestore   │  │
 │  │     API      │  │    Model     │  │     API      │  │   Database   │  │
@@ -109,7 +109,7 @@ PawConnect AI is built around a central orchestrator, the **`pawconnect_main_age
 │  │ Pet Data     │  │ Predictions  │  │ Breed ID     │  │ User Profiles│  │
 │  │ Shelter Info │  │ Rankings     │  │ Age Est.     │  │ Applications │  │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  │
-│                                                                              │
+│                                                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
 │  │  Pub/Sub     │  │ Memorystore  │  │ Cloud        │  │   Secret     │  │
 │  │  Topics      │  │   (Redis)    │  │  Storage     │  │   Manager    │  │
