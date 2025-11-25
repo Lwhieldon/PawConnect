@@ -488,7 +488,8 @@ if __name__ == "__main__":
 # ============================================================================
 
 if ADK_AVAILABLE:
-    from google.genai import Client
+    from google.adk.models import Gemini
+    import os
 
     # Define system instruction for the ADK agent
     SYSTEM_INSTRUCTION = """You are PawConnect AI, a helpful assistant specializing in pet adoption and fostering.
@@ -506,49 +507,48 @@ Key features:
 
 Be friendly, empathetic, and guide users through the pet adoption journey. Note: For production use, connect to RescueGroups API and recommendation systems."""
 
+    # Set environment variables for Vertex AI (required by ADK)
+    os.environ["GOOGLE_CLOUD_PROJECT"] = settings.gcp_project_id
+    os.environ["GOOGLE_CLOUD_LOCATION"] = settings.gcp_region
+
+    # Also set VERTEXAI environment variable to force Vertex AI usage
+    os.environ["VERTEXAI"] = "1"
+
     # Create the ADK LlmAgent with Vertex AI configuration
-    # ADK will use Vertex AI automatically when GOOGLE_APPLICATION_CREDENTIALS is set
-    # and the model name is a valid Gemini model
     try:
-        # Try different model name formats that ADK might recognize
-        model_names = [
-            "gemini-1.5-flash",  # Simplified name
-            "gemini-1.5-flash-002",  # Full version
-            "gemini-1.5-flash-001",  # Alternative version
-            "models/gemini-1.5-flash-002",  # Google AI format
-        ]
+        # Create a Gemini LLM instance with Vertex AI configuration
+        gemini_llm = Gemini(
+            model="gemini-1.5-flash",
+            vertexai=True,
+            project=settings.gcp_project_id,
+            location=settings.gcp_region
+        )
 
-        # Try to create agent with the first working model name
-        agent_created = False
-        for model_name in model_names:
-            try:
-                root_agent = LlmAgent(
-                    name="pawconnect_ai",
-                    model=model_name,
-                    instruction=SYSTEM_INSTRUCTION
-                )
-                logger.info(f"ADK root_agent created successfully with model: {model_name}")
-                logger.info(f"Using Vertex AI (project: {settings.gcp_project_id}, region: {settings.gcp_region})")
-                agent_created = True
-                break
-            except ValueError as ve:
-                logger.debug(f"Model {model_name} not found, trying next...")
-                continue
-
-        if not agent_created:
-            raise ValueError("No valid Gemini model name found")
-
-    except Exception as e:
-        logger.error(f"Failed to create ADK agent: {e}")
-        logger.warning("Creating minimal fallback agent")
-
-        # Fallback: Create a simple agent
+        # Create the ADK LlmAgent with the Gemini LLM
         root_agent = LlmAgent(
             name="pawconnect_ai",
-            model="gemini-1.5-flash",
+            model=gemini_llm,
             instruction=SYSTEM_INSTRUCTION
         )
-        logger.warning("Using fallback agent configuration")
+
+        logger.info(f"ADK root_agent created successfully with Vertex AI Gemini")
+        logger.info(f"Project: {settings.gcp_project_id}, Region: {settings.gcp_region}")
+
+    except Exception as e:
+        logger.error(f"Failed to create ADK agent with Gemini LLM: {e}")
+        logger.info("Trying simplified configuration...")
+
+        try:
+            # Fallback: Try with just model string and rely on environment variables
+            root_agent = LlmAgent(
+                name="pawconnect_ai",
+                model="gemini-1.5-flash",
+                instruction=SYSTEM_INSTRUCTION
+            )
+            logger.info("Created agent with simplified configuration")
+        except Exception as e2:
+            logger.error(f"All agent creation attempts failed: {e2}")
+            raise
 
 else:
     # Create a dummy agent if ADK is not available

@@ -152,6 +152,7 @@ docs\DIALOGFLOW_QUICK_START.md
 docs\DIALOGFLOW_SETUP.md
 .vscode
 setup-env.bat
+setup-env.ps1
 
 
 # Spyder project settings
