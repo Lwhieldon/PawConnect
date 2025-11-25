@@ -545,10 +545,13 @@ PawConnect/
 │
 ├── docs/                          # Documentation
 │   ├── API.md                    # API reference & endpoints
-│   ├── DEPLOYMENT.md             # Deployment guide (GCP)
 │   ├── ARCHITECTURE.md           # System architecture details
-│   ├── DIALOGFLOW_SETUP.md       # Dialogflow CX setup guide
-│   └── DIALOGFLOW_QUICK_START.md # Quick start for Dialogflow
+│   ├── DEPLOYMENT.md             # Deployment guide (GCP)
+│   ├── DIALOGFLOW_COMPLETE_SETUP.md       # Dialogflow CX setup guide
+│   ├── GEMINI_INTEGRATION.md       # Gemini integration guide
+│   ├── WEBHOOK_SETUP.md       # Webhook setup for Dialogflow capabilities
+
+
 │
 ├── images/                        # Project images & assets
 │   └── PawConnectAI-Logo.png     # Application logo
