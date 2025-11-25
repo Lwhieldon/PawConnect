@@ -15,6 +15,15 @@ from .schemas.user_profile import UserProfile
 from .schemas.pet_data import PetMatch
 from .utils.validators import validate_user_input
 
+# Import ADK for web interface support
+try:
+    from google.adk.agents import Agent, LlmAgent
+    from google.genai.types import Content, Part
+    ADK_AVAILABLE = True
+except ImportError:
+    ADK_AVAILABLE = False
+    logger.warning("ADK not available. Web interface will not work.")
+
 
 class PawConnectMainAgent:
     """
@@ -472,3 +481,81 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+# ============================================================================
+# ADK Web Interface Integration
+# ============================================================================
+
+if ADK_AVAILABLE:
+    from google.genai import Client
+
+    # Define system instruction for the ADK agent
+    SYSTEM_INSTRUCTION = """You are PawConnect AI, a helpful assistant specializing in pet adoption and fostering.
+
+Your capabilities include:
+- Answering questions about pet adoption and fostering
+- Providing information about breeds and pet care
+- Guiding users through the adoption process
+- Discussing pet characteristics and matching
+
+Key features:
+- Powered by Google Gemini for natural language understanding
+- Conversational AI with context awareness
+- Expert knowledge about pets and adoption
+
+Be friendly, empathetic, and guide users through the pet adoption journey. Note: For production use, connect to RescueGroups API and recommendation systems."""
+
+    # Create the ADK LlmAgent with Vertex AI configuration
+    # ADK will use Vertex AI automatically when GOOGLE_APPLICATION_CREDENTIALS is set
+    # and the model name is a valid Gemini model
+    try:
+        # Try different model name formats that ADK might recognize
+        model_names = [
+            "gemini-1.5-flash",  # Simplified name
+            "gemini-1.5-flash-002",  # Full version
+            "gemini-1.5-flash-001",  # Alternative version
+            "models/gemini-1.5-flash-002",  # Google AI format
+        ]
+
+        # Try to create agent with the first working model name
+        agent_created = False
+        for model_name in model_names:
+            try:
+                root_agent = LlmAgent(
+                    name="pawconnect_ai",
+                    model=model_name,
+                    instruction=SYSTEM_INSTRUCTION
+                )
+                logger.info(f"ADK root_agent created successfully with model: {model_name}")
+                logger.info(f"Using Vertex AI (project: {settings.gcp_project_id}, region: {settings.gcp_region})")
+                agent_created = True
+                break
+            except ValueError as ve:
+                logger.debug(f"Model {model_name} not found, trying next...")
+                continue
+
+        if not agent_created:
+            raise ValueError("No valid Gemini model name found")
+
+    except Exception as e:
+        logger.error(f"Failed to create ADK agent: {e}")
+        logger.warning("Creating minimal fallback agent")
+
+        # Fallback: Create a simple agent
+        root_agent = LlmAgent(
+            name="pawconnect_ai",
+            model="gemini-1.5-flash",
+            instruction=SYSTEM_INSTRUCTION
+        )
+        logger.warning("Using fallback agent configuration")
+
+else:
+    # Create a dummy agent if ADK is not available
+    class DummyAgent:
+        """Dummy agent for when ADK is not available."""
+        async def send(self, message: str, user_id: str = "default") -> str:
+            return "ADK is not available. Please install google-adk package."
+
+    root_agent = DummyAgent()
+    logger.warning("ADK not available - created dummy root_agent")

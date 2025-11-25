@@ -151,6 +151,8 @@ credentials/
 docs\DIALOGFLOW_QUICK_START.md
 docs\DIALOGFLOW_SETUP.md
 .vscode
+setup-env.bat
+
 
 # Spyder project settings
 .spyderproject

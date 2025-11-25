@@ -8,7 +8,10 @@ for intelligent pet matching, conversational AI, computer vision, and workflow a
 __version__ = "1.0.0"
 __author__ = "Lee Whieldon"
 
-# Lazy imports to avoid loading heavy dependencies unless explicitly needed
-# from .agent import PawConnectMainAgent
+# Import agent module for ADK web interface
+from . import agent
 
-__all__ = []
+# Make PawConnectMainAgent available at package level if needed
+from .agent import PawConnectMainAgent
+
+__all__ = ["agent", "PawConnectMainAgent"]

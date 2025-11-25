@@ -738,5 +738,5 @@ Apache-2.0
 
 **Date**: November 2025
 
-**Contact**: [\[Email\]](lwhieldon1@gmail.com) | [\[GitHub Profile\]](https://github.com/Lwhieldon)  | [\[Kaggle Profile\]](https://www.kaggle.com/leewhieldon)
+**Contact**: [\[GitHub Profile\]](https://github.com/Lwhieldon)  | [\[Kaggle Profile\]](https://www.kaggle.com/leewhieldon)
 
