@@ -48,6 +48,24 @@ class Settings(BaseSettings):
         description="Vertex AI model name"
     )
 
+    # Gemini AI (for ConversationAgent)
+    gemini_model_name: str = Field(
+        default="gemini-1.5-flash-002",
+        description="Gemini model name for conversation understanding"
+    )
+    gemini_temperature: float = Field(
+        default=0.7,
+        description="Gemini model temperature (0.0-1.0)"
+    )
+    gemini_max_output_tokens: int = Field(
+        default=1024,
+        description="Maximum tokens for Gemini responses"
+    )
+    use_gemini_for_conversation: bool = Field(
+        default=True,
+        description="Use Gemini for conversation agent (fallback to keyword matching if False)"
+    )
+
     # Cloud Vision API
     vision_api_enabled: bool = Field(default=True, description="Enable Cloud Vision API")
 

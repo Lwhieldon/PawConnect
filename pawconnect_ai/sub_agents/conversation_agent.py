@@ -1,22 +1,51 @@
 """
 Conversation Agent - User Interaction Manager
 Manages natural language dialogue and user interactions.
+Uses Google's Gemini AI for advanced natural language understanding.
 """
 
 from typing import Dict, Any, List, Optional
+import json
 from loguru import logger
 
 from ..schemas.user_profile import UserProfile, UserPreferences
+from ..config import get_settings
+
+# Lazy import for Vertex AI (allows operation without credentials in testing)
+try:
+    import vertexai
+    from vertexai.generative_models import GenerativeModel, GenerationConfig, Part
+    VERTEXAI_AVAILABLE = True
+except ImportError:
+    VERTEXAI_AVAILABLE = False
+    logger.warning("Vertex AI SDK not available. Falling back to keyword-based conversation.")
 
 
 class ConversationAgent:
     """
     Specialized agent for managing conversations and extracting user preferences.
+    Uses Google Gemini AI for advanced natural language understanding.
     """
 
     def __init__(self):
         """Initialize the conversation agent."""
         self.conversation_history = {}
+        self.settings = get_settings()
+        self.gemini_model = None
+        self.use_gemini = self.settings.use_gemini_for_conversation and VERTEXAI_AVAILABLE
+
+        # Initialize Gemini if enabled and available
+        if self.use_gemini:
+            try:
+                vertexai.init(
+                    project=self.settings.gcp_project_id,
+                    location=self.settings.gcp_region
+                )
+                self.gemini_model = GenerativeModel(self.settings.gemini_model_name)
+                logger.info(f"Gemini model initialized: {self.settings.gemini_model_name}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Gemini: {e}. Falling back to keyword matching.")
+                self.use_gemini = False
 
     def process_user_input(
         self,
@@ -45,14 +74,26 @@ class ConversationAgent:
                 "message": message
             })
 
-            # Simple intent detection (in production, would use Dialogflow CX)
-            intent = self._detect_intent(message)
-
-            # Extract entities
-            entities = self._extract_entities(message, intent)
-
-            # Generate response
-            response = self._generate_response(intent, entities, context)
+            # Use Gemini for NLU if available, otherwise fall back to keyword matching
+            if self.use_gemini and self.gemini_model:
+                try:
+                    result = self._process_with_gemini(message, context, user_id)
+                    intent = result["intent"]
+                    entities = result["entities"]
+                    response = result.get("response", self._generate_response(intent, entities, context))
+                    confidence = result.get("confidence", 0.9)
+                except Exception as e:
+                    logger.warning(f"Gemini processing failed: {e}. Falling back to keyword matching.")
+                    intent = self._detect_intent(message)
+                    entities = self._extract_entities(message, intent)
+                    response = self._generate_response(intent, entities, context)
+                    confidence = 0.85
+            else:
+                # Fallback to keyword-based intent detection
+                intent = self._detect_intent(message)
+                entities = self._extract_entities(message, intent)
+                response = self._generate_response(intent, entities, context)
+                confidence = 0.85
 
             # Store response in history
             self.conversation_history[user_id].append({
@@ -64,7 +105,8 @@ class ConversationAgent:
                 "intent": intent,
                 "entities": entities,
                 "response": response,
-                "confidence": 0.85
+                "confidence": confidence,
+                "model": "gemini" if (self.use_gemini and self.gemini_model) else "keyword"
             }
 
         except Exception as e:
@@ -73,7 +115,109 @@ class ConversationAgent:
                 "intent": "unknown",
                 "entities": {},
                 "response": "I'm sorry, I didn't understand that. Could you please rephrase?",
-                "confidence": 0.0
+                "confidence": 0.0,
+                "model": "error"
+            }
+
+    def _process_with_gemini(
+        self,
+        message: str,
+        context: Optional[Dict[str, Any]],
+        user_id: str
+    ) -> Dict[str, Any]:
+        """
+        Process user message using Gemini AI for intent detection and entity extraction.
+
+        Args:
+            message: User message to process
+            context: Optional conversation context
+            user_id: User identifier for conversation history
+
+        Returns:
+            Dictionary with intent, entities, and optional response
+        """
+        # Build conversation history for context
+        history = self.get_conversation_history(user_id)
+        history_text = "\n".join([
+            f"{msg['role']}: {msg['message']}"
+            for msg in history[-5:]  # Last 5 messages for context
+        ])
+
+        # Create prompt for Gemini with structured output
+        prompt = f"""You are a helpful pet adoption assistant for PawConnect. Analyze the user's message and extract:
+1. **Intent**: The user's primary goal
+2. **Entities**: Specific details mentioned (pet_type, size, age, etc.)
+3. **Response**: A natural, helpful response
+
+**Available Intents:**
+- search_pets: User wants to search/find pets
+- adopt_pet: User wants to adopt a pet
+- foster_pet: User wants to foster a pet
+- get_recommendations: User wants personalized recommendations
+- schedule_visit: User wants to schedule a visit/meeting
+- submit_application: User wants to submit an adoption application
+- breed_info: User wants information about breeds
+- care_info: User wants pet care information
+- greeting: User is greeting
+- help: User needs help/assistance
+- general_query: General question or unclear intent
+
+**Conversation History:**
+{history_text}
+
+**Current Message:**
+{message}
+
+**Additional Context:**
+{json.dumps(context) if context else "None"}
+
+**Output Format (JSON):**
+{{
+  "intent": "one of the intents listed above",
+  "entities": {{
+    "pet_type": "dog/cat/rabbit/etc (if mentioned)",
+    "size": "small/medium/large (if mentioned)",
+    "age": "baby/young/adult/senior (if mentioned)",
+    "breed": "specific breed (if mentioned)",
+    "location": "location (if mentioned)",
+    "other": "any other relevant details"
+  }},
+  "confidence": 0.0-1.0,
+  "reasoning": "brief explanation of why this intent was chosen",
+  "response": "A natural, empathetic response to the user"
+}}
+
+Respond with ONLY the JSON, no additional text."""
+
+        # Call Gemini
+        generation_config = GenerationConfig(
+            temperature=self.settings.gemini_temperature,
+            max_output_tokens=self.settings.gemini_max_output_tokens,
+            response_mime_type="application/json"
+        )
+
+        response = self.gemini_model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
+
+        # Parse Gemini response
+        try:
+            result = json.loads(response.text)
+            logger.info(f"Gemini analysis: {result.get('reasoning', 'No reasoning provided')}")
+            return {
+                "intent": result.get("intent", "general_query"),
+                "entities": result.get("entities", {}),
+                "confidence": result.get("confidence", 0.9),
+                "response": result.get("response", "")
+            }
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse Gemini response: {e}. Response: {response.text}")
+            # Fallback to keyword matching
+            return {
+                "intent": self._detect_intent(message),
+                "entities": self._extract_entities(message, self._detect_intent(message)),
+                "confidence": 0.5
             }
 
     def _detect_intent(self, message: str) -> str:

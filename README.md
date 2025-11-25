@@ -227,18 +227,21 @@ The main agent serves as the orchestration layer, managing user context, routing
   - Explainable recommendations with feature importance
   - Urgent case boosting for at-risk animals
 
-#### 3. **`conversation_agent`** - User Interaction Manager
+#### 3. **`conversation_agent`** - User Interaction Manager 🌟 **Powered by Gemini**
 
 - **Purpose**: Manages natural language dialogue, answers questions about breeds, care requirements, adoption processes, and guides users through the platform.
 
-- **Implementation**: Dialogflow CX with custom intents, entity extraction, and context management. Integrates with Knowledge Connectors for FAQ retrieval.
+- **Implementation**: **Google Gemini 1.5 Flash** for advanced natural language understanding with intelligent intent detection and entity extraction. Gemini enables semantic understanding beyond simple keyword matching, with automatic fallback to rule-based processing for reliability.
 
 - **Key Features**:
-  - Multi-turn conversation with context retention
+  - **Gemini-powered intent classification**: Uses structured JSON responses for accurate intent detection
+  - **Contextual entity extraction**: Understands complex queries like "I want a dog that's good with my 5-year-old and my cat"
+  - **Multi-turn conversation** with context retention across user sessions
+  - **Explainable reasoning**: Gemini provides reasoning for its intent classifications
+  - **Graceful degradation**: Falls back to keyword-based matching if Gemini is unavailable
+  - **Configurable**: Toggle Gemini on/off via `USE_GEMINI_FOR_CONVERSATION` environment variable
   - Voice interaction support (Speech-to-Text and Text-to-Speech)
-  - Sentiment analysis for adaptive responses
-  - Multilingual support (English, Spanish) with Cloud Translation API
-  - Handoff to human shelter staff when needed
+  - Multilingual support potential with Cloud Translation API integration
 
 #### 4. **`vision_agent`** - Image Analysis Specialist
 
@@ -389,7 +392,7 @@ pip install -r requirements.txt
 
 ### Configuration
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root (see `.env.example` for full template):
 
 ```env
 # Google Cloud
@@ -405,10 +408,18 @@ DIALOGFLOW_AGENT_ID=your_agent_id
 # Vertex AI
 VERTEX_AI_ENDPOINT=your_model_endpoint
 
+# Gemini AI (for ConversationAgent)
+GEMINI_MODEL_NAME=gemini-1.5-flash-002
+GEMINI_TEMPERATURE=0.7
+GEMINI_MAX_OUTPUT_TOKENS=1024
+USE_GEMINI_FOR_CONVERSATION=True
+
 # Other
 ENVIRONMENT=development
 LOG_LEVEL=INFO
 ```
+
+**Note**: Gemini uses the same GCP credentials as Vertex AI. Ensure `GCP_PROJECT_ID` and `GCP_REGION` are set correctly.
 
 ## Running the Agent
 
@@ -611,11 +622,12 @@ With additional development time, the system could incorporate:
 ## Key Technologies
 
 ### Google Cloud & AI Services
+- **Gemini 1.5 Flash** 🌟: Conversational AI for intent detection and entity extraction (ConversationAgent)
 - **Vertex AI**: Custom recommendation model training and deployment
 - **Dialogflow CX**: Conversational interface with context management
 - **Cloud Vision API**: Image analysis and breed identification
 - **Cloud Functions**: Serverless webhook fulfillment
-- **Cloud Run**: Container hosting for main agent
+- **Cloud Run** 🌟: Production container hosting with auto-scaling
 - **Pub/Sub**: Event-driven agent communication
 - **Firestore**: NoSQL database for user profiles and application state
 - **Cloud Memorystore**: Redis caching for API responses
