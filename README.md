@@ -556,6 +556,7 @@ PawConnect/
 │
 ├── images/                        # Project images & assets
 │   └── PawConnectAI-Logo.png     # Application logo
+│   └── SadieGrace.jpg     # Sadie Grace Memorial Photo
 │
 ├── .env.example                   # Environment variables template
 ├── requirements.txt               # Python dependencies
