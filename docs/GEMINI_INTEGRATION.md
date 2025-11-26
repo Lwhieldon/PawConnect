@@ -47,7 +47,7 @@ Structured Output:
    - Falls back to keyword matching on errors
 
 3. **Configuration Management** (`config.py:51-67`)
-   - Model selection (default: `gemini-1.5-flash-002`)
+   - Model selection (default: `gemini-2.0-flash-001`)
    - Temperature control (default: 0.7)
    - Max output tokens (default: 1024)
    - Enable/disable toggle via environment variable
@@ -107,7 +107,8 @@ Add to your `.env` file:
 
 ```env
 # Gemini AI (for ConversationAgent)
-GEMINI_MODEL_NAME=gemini-1.5-flash-002
+# Note: Using Gemini 2.0 (1.5 models retired April 2025)
+GEMINI_MODEL_NAME=gemini-2.0-flash-001
 GEMINI_TEMPERATURE=0.7
 GEMINI_MAX_OUTPUT_TOKENS=1024
 USE_GEMINI_FOR_CONVERSATION=True
@@ -119,11 +120,14 @@ GCP_REGION=us-central1
 
 ### Model Options
 
-Available Gemini models via Vertex AI:
+Available Gemini models via Vertex AI (as of 2025):
 
-- `gemini-1.5-flash-002` (recommended): Fast, cost-effective, excellent for conversational AI
-- `gemini-1.5-pro-002`: More capable, higher cost, better for complex reasoning
-- `gemini-1.0-pro`: Stable version for production workloads
+- `gemini-2.0-flash-001` (recommended): Current stable version, fast and cost-effective
+- `gemini-2.5-flash`: Latest version with enhanced capabilities
+- `gemini-2.5-flash-lite`: Optimized for cost efficiency and low latency
+- `gemini-2.5-pro`: Most capable, higher cost, best for complex reasoning
+
+Note: Gemini 1.5 models were retired April 29, 2025.
 
 ### Temperature Settings
 
@@ -212,7 +216,7 @@ logging.basicConfig(level=logging.DEBUG)
 The ConversationAgent logs indicate which mode is active:
 
 ```
-INFO: Gemini model initialized: gemini-1.5-flash-002
+INFO: Gemini model initialized: gemini-2.0-flash-001
 INFO: Gemini analysis: User clearly wants to search for a medium-sized dog
 ```
 

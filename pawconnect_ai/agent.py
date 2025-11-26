@@ -495,6 +495,7 @@ if ADK_AVAILABLE:
     SYSTEM_INSTRUCTION = """You are PawConnect AI, a helpful assistant specializing in pet adoption and fostering.
 
 Your capabilities include:
+- Searching for available pets from RescueGroups.org database
 - Answering questions about pet adoption and fostering
 - Providing information about breeds and pet care
 - Guiding users through the adoption process
@@ -502,10 +503,16 @@ Your capabilities include:
 
 Key features:
 - Powered by Google Gemini for natural language understanding
+- Direct access to RescueGroups API for real-time pet availability
 - Conversational AI with context awareness
 - Expert knowledge about pets and adoption
 
-Be friendly, empathetic, and guide users through the pet adoption journey. Note: For production use, connect to RescueGroups API and recommendation systems."""
+When a user asks to find pets:
+1. Use the search_pets function to query RescueGroups
+2. Present the results with pet names, breeds, and descriptions
+3. Include links to adoption pages when available
+
+Be friendly, empathetic, and guide users through the pet adoption journey with real pet listings."""
 
     # Set environment variables for Vertex AI (required by ADK)
     os.environ["GOOGLE_CLOUD_PROJECT"] = settings.gcp_project_id
@@ -514,41 +521,158 @@ Be friendly, empathetic, and guide users through the pet adoption journey. Note:
     # Also set VERTEXAI environment variable to force Vertex AI usage
     os.environ["VERTEXAI"] = "1"
 
+    # Create function tools for RescueGroups API access
+    async def search_pets(
+        pet_type: str = "dog",
+        location: str = "",
+        breed: str = "",
+        size: str = "",
+        age: str = "",
+        limit: int = 10
+    ) -> str:
+        """
+        Search for available pets from RescueGroups.org database.
+
+        Args:
+            pet_type: Type of pet to search for (dog, cat, rabbit, etc.)
+            location: Location to search (city, state or ZIP code)
+            breed: Specific breed to search for (optional)
+            size: Size of pet (small, medium, large, extra-large) (optional)
+            age: Age group (baby, young, adult, senior) (optional)
+            limit: Maximum number of results to return (default 10, max 100)
+
+        Returns:
+            JSON string containing list of available pets with details
+        """
+        import json
+        from .sub_agents.pet_search_agent import PetSearchAgent
+
+        try:
+            # Create search agent
+            search_agent = PetSearchAgent()
+
+            # Build kwargs for additional filters
+            kwargs = {}
+            if breed:
+                kwargs['breed'] = breed
+            if size:
+                kwargs['size'] = size
+            if age:
+                kwargs['age'] = age
+
+            # Run async search (we're already in async context from ADK)
+            pets = await search_agent.search_pets(
+                pet_type=pet_type,
+                location=location,
+                limit=min(limit, 100),
+                **kwargs
+            )
+
+            # Format results for Gemini
+            if not pets:
+                return json.dumps({
+                    "success": False,
+                    "message": f"No {pet_type}s found in {location or 'the database'}",
+                    "pets": []
+                })
+
+            # Convert Pet objects to dicts (limit to requested number)
+            results = []
+            for pet in pets[:limit]:
+                try:
+                    pet_dict = {
+                        "id": pet.pet_id,
+                        "name": pet.name,
+                        "breed": pet.breed or "Mixed Breed",
+                        "age": pet.age.value if hasattr(pet.age, 'value') else str(pet.age),
+                        "size": pet.size.value if hasattr(pet.size, 'value') else str(pet.size),
+                        "sex": pet.gender.value if hasattr(pet.gender, 'value') else str(pet.gender),
+                        "description": pet.description[:200] + "..." if len(pet.description) > 200 else pet.description,
+                        "location": f"{pet.shelter.city}, {pet.shelter.state}" if pet.shelter else "Location not specified",
+                        "shelter_name": pet.shelter.name if pet.shelter else "Unknown",
+                        "photo_url": str(pet.primary_photo_url) if pet.primary_photo_url else None,
+                        "adoption_url": f"https://rescuegroups.org/animal/{pet.external_id}" if pet.external_id else None
+                    }
+                    results.append(pet_dict)
+                except Exception as e:
+                    logger.error(f"Error processing pet {pet.name}: {e}")
+                    continue
+
+            return json.dumps({
+                "success": True,
+                "message": f"Found {len(results)} {pet_type}(s) in {location or 'the database'}",
+                "count": len(results),
+                "pets": results
+            }, indent=2)
+
+        except Exception as e:
+            logger.error(f"Error in search_pets function: {e}")
+            return json.dumps({
+                "success": False,
+                "message": f"Error searching for pets: {str(e)}",
+                "pets": []
+            })
+
     # Create the ADK LlmAgent with Vertex AI configuration
     try:
-        # Create a Gemini LLM instance with Vertex AI configuration
-        gemini_llm = Gemini(
-            model="gemini-1.5-flash",
+        from google.genai import Client
+        from functools import cached_property
+
+        # Create a custom Gemini subclass that properly maintains Vertex AI config
+        class VertexAIGemini(Gemini):
+            """Custom Gemini class that ensures Vertex AI configuration persists."""
+
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                # Store the Vertex AI configuration
+                self._vertexai = kwargs.get('vertexai', True)
+                self._project = kwargs.get('project')
+                self._location = kwargs.get('location')
+                # Pre-create the client
+                self._cached_client = Client(
+                    vertexai=self._vertexai,
+                    project=self._project,
+                    location=self._location
+                )
+
+            @property
+            def api_client(self):
+                """Override api_client property to return our pre-configured client."""
+                return self._cached_client
+
+        # Create a VertexAIGemini LLM instance with proper configuration
+        # Using Gemini 2.0 Flash (Gemini 1.5 models retired April 2025)
+        gemini_llm = VertexAIGemini(
+            model="gemini-2.0-flash-001",
             vertexai=True,
             project=settings.gcp_project_id,
             location=settings.gcp_region
         )
 
-        # Create the ADK LlmAgent with the Gemini LLM
+        # Create the ADK LlmAgent with the configured Gemini LLM and tools
         root_agent = LlmAgent(
             name="pawconnect_ai",
             model=gemini_llm,
-            instruction=SYSTEM_INSTRUCTION
+            instruction=SYSTEM_INSTRUCTION,
+            tools=[search_pets]
         )
 
         logger.info(f"ADK root_agent created successfully with Vertex AI Gemini")
         logger.info(f"Project: {settings.gcp_project_id}, Region: {settings.gcp_region}")
+        logger.info(f"Custom VertexAI Gemini class configured")
+        logger.info(f"Function tools registered: search_pets")
 
     except Exception as e:
         logger.error(f"Failed to create ADK agent with Gemini LLM: {e}")
-        logger.info("Trying simplified configuration...")
+        logger.warning(f"Error details: {type(e).__name__}: {str(e)}")
 
-        try:
-            # Fallback: Try with just model string and rely on environment variables
-            root_agent = LlmAgent(
-                name="pawconnect_ai",
-                model="gemini-1.5-flash",
-                instruction=SYSTEM_INSTRUCTION
-            )
-            logger.info("Created agent with simplified configuration")
-        except Exception as e2:
-            logger.error(f"All agent creation attempts failed: {e2}")
-            raise
+        # If this fails, PawConnect won't work with ADK web interface
+        # User will need to check their GCP credentials and configuration
+        raise RuntimeError(
+            f"Failed to initialize PawConnect AI with Vertex AI. "
+            f"Please ensure GOOGLE_APPLICATION_CREDENTIALS is set correctly. "
+            f"Error: {e}"
+        )
 
 else:
     # Create a dummy agent if ADK is not available

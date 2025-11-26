@@ -49,8 +49,9 @@ class Settings(BaseSettings):
     )
 
     # Gemini AI (for ConversationAgent)
+    # Note: Gemini 1.5 models retired April 2025, using Gemini 2.0
     gemini_model_name: str = Field(
-        default="gemini-1.5-flash-002",
+        default="gemini-2.0-flash-001",
         description="Gemini model name for conversation understanding"
     )
     gemini_temperature: float = Field(

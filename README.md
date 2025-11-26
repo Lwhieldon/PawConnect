@@ -409,7 +409,8 @@ DIALOGFLOW_AGENT_ID=your_agent_id
 VERTEX_AI_ENDPOINT=your_model_endpoint
 
 # Gemini AI (for ConversationAgent)
-GEMINI_MODEL_NAME=gemini-1.5-flash-002
+# Note: Using Gemini 2.0 (1.5 models retired April 2025)
+GEMINI_MODEL_NAME=gemini-2.0-flash-001
 GEMINI_TEMPERATURE=0.7
 GEMINI_MAX_OUTPUT_TOKENS=1024
 USE_GEMINI_FOR_CONVERSATION=True
