@@ -733,6 +733,23 @@ Apache-2.0
 
 ---
 
+## 💙 In Loving Memory
+
+<div align="center">
+  <img src="images/SadieGrace.jpg" alt="Sadie Grace" width="400"/>
+
+  ### Sadie Grace
+  *Forever in Our Hearts*
+
+  This project is dedicated to the memory of **Sadie Grace**, a beautiful soul who showed us the unconditional love and joy that pets bring to our lives. Her gentle spirit and wagging tail reminded us every day why the work of connecting pets with loving homes matters so deeply.
+
+  Sadie Grace embodied everything this project stands for—the transformative power of the human-animal bond and the importance of ensuring every pet finds their forever home. Though she has crossed the rainbow bridge, her legacy lives on in every successful adoption this system helps facilitate.
+
+  *Rest easy, sweet girl. You were the goodest girl.*
+</div>
+
+---
+
 **Competition**: Agents Intensive Capstone Project
 
 **Author**: Lee Whieldon
