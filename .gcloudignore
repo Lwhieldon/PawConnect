@@ -61,3 +61,8 @@ notebooks/
 *.tmp
 .DS_Store
 Thumbs.db
+setup-env.bat
+setup-env.ps1
+KAGGLE_WRITEUP.md
+eval
+images/
