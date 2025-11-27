@@ -259,8 +259,13 @@ def validate_search_params(
 
     if location:
         location = sanitize_string(location, 100)
-        # Basic validation - should be ZIP code or "City, State"
-        if not (validate_zip_code(location) or "," in location):
-            return False, "Location must be a ZIP code or 'City, State' format"
+        # Location can be:
+        # - ZIP code (5 digits)
+        # - City, State format
+        # - State name only (will search entire state)
+        # - Empty (will search all locations)
+        # Just validate it's not completely invalid
+        if location and len(location) > 100:
+            return False, "Location string is too long"
 
     return True, None

@@ -341,21 +341,25 @@ def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "city": org_data.get("city", "Unknown"),
                 "state": org_data.get("state", "XX"),
                 "zip_code": org_data.get("postalcode", "00000"),
+                "website": org_data.get("url") or org_data.get("website"),  # Capture website URL
             }
 
-            # Extract attributes (many fields not available in v5 public API)
-            # Note: Some attributes are not available in the public API, so we use defaults
+            # Extract attributes from v5 API fields
             attributes = {
-                "good_with_children": None,  # Not available in public API (can be None)
-                "good_with_dogs": None,
-                "good_with_cats": None,
-                "house_trained": False,  # Not available, use default
-                "declawed": False,
-                "spayed_neutered": False,  # Not available, use default
-                "special_needs": False,  # Not available, use default
-                "shots_current": True,
-                "energy_level": "moderate"  # Default since not provided
+                "good_with_children": animal.get("isGoodWithKids"),
+                "good_with_dogs": animal.get("isGoodWithDogs"),
+                "good_with_cats": animal.get("isGoodWithCats"),
+                "house_trained": animal.get("isHousetrained", False),
+                "declawed": False,  # Not available in API
+                "spayed_neutered": False,  # Not available in API
+                "special_needs": animal.get("isSpecialNeeds", False),
+                "shots_current": True,  # Assume true if not specified
+                "energy_level": animal.get("activityLevel", "moderate").lower() if animal.get("activityLevel") else "moderate"
             }
+
+            # Capture special needs description and allergies for inclusion in description
+            special_needs_desc = animal.get("specialNeedsDescription", "")
+            has_allergies = animal.get("isHasAllergies", False)
 
             # Map size to our format
             size_raw = animal.get("sizeCurrent", "Medium")
@@ -392,10 +396,16 @@ def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
             # Get coat length
             coat = animal.get("coatLength", "").lower() if animal.get("coatLength") else None
 
+            # Get slug and URL for linking
+            slug = animal.get("slug")
+            animal_url = animal.get("url")  # Direct URL to animal listing if available
+
             # Build pet data
             pet_data = {
                 "pet_id": f"rg_{animal_id}",
                 "external_id": str(animal_id),
+                "slug": slug,  # Add slug for URL construction
+                "animal_url": animal_url,  # Direct animal URL if available
                 "name": animal.get("name", "Unknown"),
                 "species": species,
                 "breed": animal.get("breedPrimary") or animal.get("breedString", "Mixed Breed"),
@@ -408,6 +418,8 @@ def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "coat": coat,
                 "attributes": attributes,
                 "description": animal.get("descriptionText", ""),
+                "special_needs_info": special_needs_desc if special_needs_desc else None,
+                "has_allergies": has_allergies,
                 "photos": photos,
                 "primary_photo_url": photos[0]["url"] if photos else None,
                 "shelter": shelter,

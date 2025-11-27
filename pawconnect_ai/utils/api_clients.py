@@ -90,28 +90,6 @@ class RescueGroupsClient:
         # Species is included in the URL path, not as a filter
         species_path = f"/{pet_type}s" if pet_type else ""
 
-        if location:
-            # RescueGroups uses postal code for location filtering
-            # Extract zip code from location (if it's "City, State" format, we need to handle it)
-            zip_code = location
-            if "," in location:
-                # If location is "Seattle, WA", we can't use it directly
-                # For now, skip location filter if not a zip code
-                logger.warning(f"Location '{location}' is not a zip code. Skipping location filter. Please provide a 5-digit zip code for location filtering.")
-            else:
-                # Postal code filter
-                filters.append({
-                    "fieldName": "animalLocation",
-                    "operation": "equals",
-                    "criteria": zip_code
-                })
-                # Distance radius filter
-                filters.append({
-                    "fieldName": "animalLocationDistance",
-                    "operation": "radius",
-                    "criteria": str(distance)
-                })
-
         # Build request body - v5 uses flat structure, not wrapped in "data"
         request_body = {
             "filters": filters,
@@ -124,13 +102,38 @@ class RescueGroupsClient:
                     "descriptionText", "descriptionHtml",
                     "pictureThumbnailUrl", "pictureCount",
                     "isAdoptionPending", "priority", "rescueId",
-                    "createdDate", "updatedDate"
+                    "createdDate", "updatedDate",
+                    "slug", "url",  # Add slug and url fields for linking
+                    # Health and medical fields
+                    "isSpecialNeeds", "specialNeedsDescription", "isMicrochipped",
+                    "isHousetrained", "qualities", "activityLevel",
+                    "fenceNeeded", "isHasAllergies", "isGoodWithCats", "isGoodWithDogs",
+                    "isGoodWithKids", "ownerExperience"
                 ],
-                "orgs": ["name", "email", "phone", "street", "city", "state", "postalcode", "url"]
+                "orgs": ["name", "email", "phone", "street", "city", "state", "postalcode", "url", "website"]
             },
             "limit": str(min(limit, 250)),  # RescueGroups max is 250
-            "page": str(page)
+            "page": str(page),
+            "sort": [{"field": "animals.id", "direction": "asc"}]  # Add sort parameter
         }
+
+        # Add location filtering using filterRadius (v5 API format)
+        if location:
+            import re
+            is_zip = bool(re.match(r'^\d{5}(-\d{4})?$', location.strip()))
+
+            if is_zip:
+                # RescueGroups API v5 uses filterRadius object for location-based searches
+                # Note: Some API endpoints may not support filterRadius in public search
+                request_body["filterRadius"] = {
+                    "postalcode": location.strip(),
+                    "miles": str(distance)  # Convert to string for API compatibility
+                }
+                logger.info(f"Searching within {distance} miles of ZIP code {location}")
+                logger.debug(f"filterRadius: {request_body['filterRadius']}")
+            else:
+                # Not a ZIP code - search all locations
+                logger.info(f"Location '{location}' is not a ZIP code. Searching all locations. For location-specific results, please provide a 5-digit ZIP code.")
 
         # Log request for debugging
         api_url = f"{self.base_url}/public/animals/search/available{species_path}"

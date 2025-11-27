@@ -41,8 +41,16 @@ async def test_real_vision_api():
     print("=" * 60)
 
     # Example: Use a publicly accessible dog image
-    # Replace with your own image URL
-    test_image_url = "https://t3.ftcdn.net/jpg/02/35/69/04/240_F_235690407_Mp2tDFESZLVeRYTqnyfF0KCzfMsRC2sO.jpg"  # Sample dog image
+    # Replace with your own image URL or use one from RescueGroups
+
+    # Option 1: Wikimedia Commons (stable, public domain)
+    test_image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Labrador_on_Quantock_%282175262184%29.jpg/800px-Labrador_on_Quantock_%282175262184%29.jpg"
+
+    # Option 2: Use an image from RescueGroups (from actual search results)
+    # test_image_url = "https://cdn.rescuegroups.org/4264/pictures/animals/10552/10552500/38813998.jpg"
+
+    # Option 3: Another Wikimedia Commons dog image
+    # test_image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/Golden_Retriever_standing_Tucker.jpg/800px-Golden_Retriever_standing_Tucker.jpg"
 
     print(f"\nAnalyzing image: {test_image_url}")
     print("This will call the real Google Cloud Vision API...")

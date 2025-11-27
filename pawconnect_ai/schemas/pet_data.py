@@ -157,6 +157,24 @@ class Pet(BaseModel):
         default=None,
         description="External system ID (e.g., RescueGroups ID)"
     )
+    slug: Optional[str] = Field(
+        default=None,
+        description="URL slug for pet listing page"
+    )
+    animal_url: Optional[str] = Field(
+        default=None,
+        description="Direct URL to animal listing if provided by API"
+    )
+
+    # Medical and special needs information
+    special_needs_info: Optional[str] = Field(
+        default=None,
+        description="Description of any special medical needs or medications required"
+    )
+    has_allergies: bool = Field(
+        default=False,
+        description="Whether the pet has allergies"
+    )
 
     # Basic information
     name: str = Field(..., description="Pet name")
