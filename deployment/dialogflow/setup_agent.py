@@ -600,6 +600,49 @@ class DialogflowSetup:
             ]
         )
 
+        # intent.get_pet_details - captures requests for specific pet information
+        self.get_or_create_intent(
+            "intent.get_pet_details",
+            [
+                # By pet name
+                [{"text": "Tell me more about "}, {"text": "Lucky", "parameter_id": "pet_id"}],
+                [{"text": "Tell me about "}, {"text": "Rosie", "parameter_id": "pet_id"}],
+                [{"text": "I want to know more about "}, {"text": "Gabino", "parameter_id": "pet_id"}],
+                [{"text": "Show me more about "}, {"text": "Sponsor Joe", "parameter_id": "pet_id"}],
+                [{"text": "More information about "}, {"text": "Lucky", "parameter_id": "pet_id"}],
+                [{"text": "Can I learn more about "}, {"text": "Rosie", "parameter_id": "pet_id"}],
+                [{"text": "What about "}, {"text": "Gabino", "parameter_id": "pet_id"}],
+                [{"text": "Tell me about the "}, {"text": "Labrador", "parameter_id": "pet_id"}],
+                [{"text": "More about "}, {"text": "Lucky", "parameter_id": "pet_id"}],
+                [{"text": "Info on "}, {"text": "Rosie", "parameter_id": "pet_id"}],
+                [{"text": "Details about "}, {"text": "Lucky", "parameter_id": "pet_id"}],
+
+                # By pet ID
+                [{"text": "Tell me about pet "}, {"text": "10244680", "parameter_id": "pet_id"}],
+                [{"text": "Show me pet "}, {"text": "10353561", "parameter_id": "pet_id"}],
+                [{"text": "I want to know about "}, {"text": "10399685", "parameter_id": "pet_id"}],
+                [{"text": "More info on "}, {"text": "10244680", "parameter_id": "pet_id"}],
+                [{"text": "Details for "}, {"text": "10353561", "parameter_id": "pet_id"}],
+                [{"text": "Tell me more about ID "}, {"text": "10244680", "parameter_id": "pet_id"}],
+                [{"text": "Show me ID "}, {"text": "10399685", "parameter_id": "pet_id"}],
+
+                # Mixed patterns
+                [{"text": "More about pet "}, {"text": "Lucky", "parameter_id": "pet_id"}],
+                [{"text": "I'd like to know more about "}, {"text": "10244680", "parameter_id": "pet_id"}],
+                [{"text": "Can you tell me about "}, {"text": "Rosie", "parameter_id": "pet_id"}],
+                [{"text": "What can you tell me about "}, {"text": "Gabino", "parameter_id": "pet_id"}],
+
+                # Simple patterns (just the name/ID)
+                [{"text": "Lucky"}],
+                [{"text": "10244680"}],
+                [{"text": "Rosie"}],
+                [{"text": "Pet "}, {"text": "10353561", "parameter_id": "pet_id"}]
+            ],
+            parameters=[
+                {"id": "pet_id", "entity_type": sys_any}
+            ]
+        )
+
         logger.info("✓ Intents configured")
 
     def setup_webhook(self) -> Optional[str]:
@@ -652,6 +695,7 @@ class DialogflowSetup:
         # Get intents first (needed for routes)
         intent_search_pets = self._intents_cache.get("intent.search_pets")
         intent_get_recommendations = self._intents_cache.get("intent.get_recommendations")
+        intent_get_pet_details = self._intents_cache.get("intent.get_pet_details")
 
         if not intent_search_pets or not intent_get_recommendations:
             logger.warning("  Intents not found in cache, skipping page configuration")
@@ -1003,6 +1047,88 @@ class DialogflowSetup:
             self.pages_client.update_page(page=get_rec_page)
             logger.info("  ✓ Get Recommendations page updated (cleared entry fulfillment, set webhook route)")
 
+        # Pet Details page
+        if "Pet Details" not in pages_by_name:
+            logger.info("  Creating Pet Details page...")
+
+            pet_details_page = self.pages_client.create_page(
+                parent=flow_name,
+                page=Page(
+                    display_name="Pet Details",
+                    form=Form(
+                        parameters=[
+                            Form.Parameter(
+                                display_name="pet_id",
+                                entity_type="projects/-/locations/-/agents/-/entityTypes/sys.any",
+                                required=True,
+                                fill_behavior=Form.Parameter.FillBehavior(
+                                    initial_prompt_fulfillment=Fulfillment(
+                                        messages=[ResponseMessage(text=ResponseMessage.Text(
+                                            text=["Which pet would you like to know more about? Please provide the pet's name or ID number."]
+                                        ))]
+                                    )
+                                )
+                            )
+                        ]
+                    ),
+                    transition_routes=[
+                        TransitionRoute(
+                            condition="$page.params.status = \"FINAL\"",
+                            trigger_fulfillment=Fulfillment(
+                                webhook=webhook_name,
+                                tag="validate-pet-id"
+                            ) if webhook_name else Fulfillment(
+                                messages=[ResponseMessage(text=ResponseMessage.Text(text=["Looking up pet details..."]))]
+                            )
+                            # No target specified - let webhook response control the flow
+                        )
+                    ]
+                )
+            )
+            logger.info("  ✓ Pet Details page created with pet_id parameter and validate-pet-id webhook")
+        else:
+            # Update existing page to ensure webhook route is configured
+            logger.info("  Updating Pet Details page with pet_id parameter and webhook route...")
+            pet_details_page = pages_by_name["Pet Details"]
+
+            # Create a brand new Page object with all the configuration
+            pet_details_page = Page(
+                name=pet_details_page.name,  # Preserve the page path
+                display_name="Pet Details",
+                form=Form(
+                    parameters=[
+                        Form.Parameter(
+                            display_name="pet_id",
+                            entity_type="projects/-/locations/-/agents/-/entityTypes/sys.any",
+                            required=True,
+                            fill_behavior=Form.Parameter.FillBehavior(
+                                initial_prompt_fulfillment=Fulfillment(
+                                    messages=[ResponseMessage(text=ResponseMessage.Text(
+                                        text=["Which pet would you like to know more about? Please provide the pet's name or ID number."]
+                                    ))]
+                                )
+                            )
+                        )
+                    ]
+                ),
+                entry_fulfillment=Fulfillment(),  # Clear to prevent double webhook calls
+                transition_routes=[
+                    TransitionRoute(
+                        condition="$page.params.status = \"FINAL\"",
+                        trigger_fulfillment=Fulfillment(
+                            webhook=webhook_name,
+                            tag="validate-pet-id"
+                        ) if webhook_name else Fulfillment(
+                            messages=[ResponseMessage(text=ResponseMessage.Text(text=["Looking up pet details..."]))]
+                        )
+                    )
+                ]
+            )
+
+            # Update the page
+            self.pages_client.update_page(page=pet_details_page)
+            logger.info("  ✓ Pet Details page updated (pet_id parameter, validate-pet-id webhook)")
+
         # Add transition routes to START_PAGE
         if start_page:
             logger.info("  Configuring START_PAGE transition routes...")
@@ -1011,10 +1137,11 @@ class DialogflowSetup:
             pages_list = list(self.pages_client.list_pages(parent=flow_name))
             pet_search_page = next((p for p in pages_list if p.display_name == "Pet Search"), None)
             get_rec_page = next((p for p in pages_list if p.display_name == "Get Recommendations"), None)
+            pet_details_page = next((p for p in pages_list if p.display_name == "Pet Details"), None)
 
             if pet_search_page and get_rec_page:
                 start_page.transition_routes.clear()
-                start_page.transition_routes.extend([
+                routes = [
                     TransitionRoute(
                         intent=intent_search_pets.name,
                         trigger_fulfillment=Fulfillment(
@@ -1027,7 +1154,19 @@ class DialogflowSetup:
                         intent=intent_get_recommendations.name,
                         target_page=get_rec_page.name
                     )
-                ])
+                ]
+
+                # Add pet details route if intent and page exist
+                if intent_get_pet_details and pet_details_page:
+                    routes.append(
+                        TransitionRoute(
+                            intent=intent_get_pet_details.name,
+                            target_page=pet_details_page.name
+                        )
+                    )
+                    logger.info("  Added route for intent.get_pet_details -> Pet Details page")
+
+                start_page.transition_routes.extend(routes)
 
                 self.pages_client.update_page(page=start_page)
                 logger.info("  ✓ Transition routes configured")
@@ -1039,15 +1178,20 @@ class DialogflowSetup:
             pages_list = list(self.pages_client.list_pages(parent=flow_name))
             pet_search_page = next((p for p in pages_list if p.display_name == "Pet Search"), None)
             get_rec_page = next((p for p in pages_list if p.display_name == "Get Recommendations"), None)
+            pet_details_page = next((p for p in pages_list if p.display_name == "Pet Details"), None)
 
             if pet_search_page and get_rec_page:
                 # Get the flow and add transition routes
                 flow = self.flows_client.get_flow(name=flow_name)
 
                 # Keep existing routes but filter out our intents first to avoid duplicates
+                our_intents = [intent_search_pets.name, intent_get_recommendations.name]
+                if intent_get_pet_details:
+                    our_intents.append(intent_get_pet_details.name)
+
                 existing_routes = [
                     route for route in flow.transition_routes
-                    if route.intent not in [intent_search_pets.name, intent_get_recommendations.name]
+                    if route.intent not in our_intents
                 ]
 
                 # Add our routes
@@ -1065,6 +1209,16 @@ class DialogflowSetup:
                         target_page=get_rec_page.name
                     )
                 ]
+
+                # Add pet details route if intent and page exist
+                if intent_get_pet_details and pet_details_page:
+                    new_routes.append(
+                        TransitionRoute(
+                            intent=intent_get_pet_details.name,
+                            target_page=pet_details_page.name
+                        )
+                    )
+                    logger.info("  Added flow-level route for intent.get_pet_details -> Pet Details page")
 
                 # Update flow with combined routes
                 flow.transition_routes.clear()
