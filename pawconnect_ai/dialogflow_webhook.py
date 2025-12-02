@@ -241,10 +241,57 @@ async def handle_search_pets(
     """
     try:
         # Extract search parameters
-        pet_type = parameters.get("pet_type")
+        pet_type = parameters.get("pet_type") or parameters.get("species")
+        breed = parameters.get("breed")
         location = parameters.get("location")
         pet_size = parameters.get("pet_size")
         pet_age = parameters.get("pet_age")
+
+        # If breed is specified, infer species if not provided
+        if breed and not pet_type:
+            # Common dog breeds
+            dog_breeds = ["labrador", "golden", "retriever", "shepherd", "bulldog", "beagle", "poodle",
+                         "husky", "corgi", "boxer", "dachshund", "terrier"]
+            # Common cat breeds
+            cat_breeds = ["siamese", "persian", "maine coon", "bengal", "ragdoll", "sphynx"]
+
+            breed_lower = breed.lower()
+            if any(db in breed_lower for db in dog_breeds):
+                pet_type = "dog"
+                logger.info(f"  Inferred pet_type='dog' from breed='{breed}'")
+            elif any(cb in breed_lower for cb in cat_breeds):
+                pet_type = "cat"
+                logger.info(f"  Inferred pet_type='cat' from breed='{breed}'")
+
+        # Validate and clean pet_type
+        valid_pet_types = ["dog", "cat", "rabbit", "bird", "small_animal", "puppy", "kitten"]
+        if pet_type and pet_type.lower() not in valid_pet_types:
+            logger.warning(f"Invalid pet_type extracted: '{pet_type}'")
+            # Ask user to clarify
+            return create_text_response(
+                "I'd be happy to help you find a pet! Are you looking for a dog, cat, rabbit, bird, or other type of pet?"
+            )
+
+        # Clean location - extract just the city name or ZIP if it's too long
+        if location and len(location) > 50:
+            logger.warning(f"Location too long ({len(location)} chars): '{location}'")
+            # Try to extract city name from the beginning
+            words = location.split()
+            if len(words) > 0:
+                # Take first word as potential city name
+                location = words[0].strip()
+                logger.info(f"  Extracted city: '{location}'")
+
+        # Validate location - check if it looks like a common mis-extraction
+        invalid_locations = [
+            "maintenance", "apartment", "living", "friendly", "sized",
+            "good", "suitable", "owner", "first", "time", "children", "cats"
+        ]
+        if location and location.lower() in invalid_locations:
+            logger.warning(f"Invalid location extracted: '{location}' - asking user to clarify")
+            return create_text_response(
+                "I couldn't quite catch your location. Could you please tell me what city or ZIP code you're in? For example, 'Seattle' or '98101'."
+            )
 
         if not location:
             return create_text_response(
@@ -259,7 +306,7 @@ async def handle_search_pets(
             )
 
         # Search for pets using RescueGroups API
-        logger.info(f"Searching for pets: type={pet_type}, location={location}")
+        logger.info(f"Searching for pets: type={pet_type}, breed={breed}, location={location}")
 
         result = await rescuegroups_client.search_pets(
             pet_type=pet_type,
@@ -270,8 +317,9 @@ async def handle_search_pets(
 
         # Check if any pets were found
         if not result or "data" not in result or not result["data"]:
+            breed_text = f" {breed}" if breed else ""
             response_text = (
-                f"I couldn't find any {pet_type or 'pet'}s near {location}. "
+                f"I couldn't find any{breed_text} {pet_type or 'pet'}s near {location}. "
                 "Would you like to expand your search area or try different criteria?"
             )
             return create_text_response(response_text)
@@ -279,15 +327,18 @@ async def handle_search_pets(
         # Count results
         pet_count = len(result["data"])
 
-        # Store search results in session
+        # Store search results in session (including breed if provided)
         updated_parameters = {
             **parameters,
             "search_results_count": pet_count,
             "last_search_location": location
         }
+        if breed:
+            updated_parameters["search_breed"] = breed
 
+        breed_text = f" {breed}" if breed else ""
         response_text = (
-            f"Great news! I found {pet_count} {pet_type or 'pet'}{'s' if pet_count != 1 else ''} "
+            f"Great news! I found {pet_count}{breed_text} {pet_type or 'pet'}{'s' if pet_count != 1 else ''} "
             f"near {location}. Would you like me to show you personalized recommendations "
             f"based on your preferences?"
         )
@@ -395,6 +446,21 @@ async def handle_get_recommendations(
         experience = parameters.get("experience")
 
         logger.info(f"Get recommendations - housing: {housing}, experience: {experience}, location: {location}, pet_type: {pet_type}")
+
+        # Validate and clean pet_type
+        valid_pet_types = ["dog", "cat", "rabbit", "bird", "small_animal", "puppy", "kitten"]
+        if pet_type and pet_type.lower() not in valid_pet_types:
+            logger.warning(f"Invalid pet_type extracted: '{pet_type}'")
+            pet_type = "dog"  # Default to dog for recommendations
+            logger.info(f"  Defaulting to pet_type='dog' for recommendations")
+
+        # Clean location - extract just the city name or ZIP if it's too long
+        if location and len(location) > 50:
+            logger.warning(f"Location too long ({len(location)} chars): '{location}'")
+            words = location.split()
+            if len(words) > 0:
+                location = words[0].strip()
+                logger.info(f"  Extracted city: '{location}'")
 
         if not location:
             return create_text_response(

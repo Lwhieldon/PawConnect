@@ -47,6 +47,7 @@ from google.cloud.dialogflowcx_v3.types import (
     EntityType,
     Page,
     Flow,
+    Form,
     Fulfillment,
     ResponseMessage,
     TransitionRoute,
@@ -258,6 +259,108 @@ class DialogflowSetup:
             ]
         )
 
+        # Dog breeds - comprehensive list
+        self.get_or_create_entity_type(
+            "dog_breed",
+            [
+                # Popular breeds
+                {"value": "labrador retriever", "synonyms": ["labrador retriever", "labrador", "lab", "labs"]},
+                {"value": "golden retriever", "synonyms": ["golden retriever", "golden", "goldens"]},
+                {"value": "german shepherd", "synonyms": ["german shepherd", "gsd", "shepherd"]},
+                {"value": "french bulldog", "synonyms": ["french bulldog", "frenchie", "french bull"]},
+                {"value": "bulldog", "synonyms": ["bulldog", "english bulldog", "bull dog"]},
+                {"value": "beagle", "synonyms": ["beagle", "beagles"]},
+                {"value": "poodle", "synonyms": ["poodle", "standard poodle", "miniature poodle", "toy poodle"]},
+                {"value": "rottweiler", "synonyms": ["rottweiler", "rottie", "rotty"]},
+                {"value": "yorkshire terrier", "synonyms": ["yorkshire terrier", "yorkie", "yorkies"]},
+                {"value": "boxer", "synonyms": ["boxer", "boxers"]},
+                {"value": "dachshund", "synonyms": ["dachshund", "wiener dog", "doxie"]},
+
+                # Working breeds
+                {"value": "siberian husky", "synonyms": ["siberian husky", "husky", "huskies"]},
+                {"value": "great dane", "synonyms": ["great dane", "dane"]},
+                {"value": "doberman pinscher", "synonyms": ["doberman pinscher", "doberman", "dobie"]},
+                {"value": "bernese mountain dog", "synonyms": ["bernese mountain dog", "bernese", "berner"]},
+                {"value": "saint bernard", "synonyms": ["saint bernard", "st bernard"]},
+                {"value": "mastiff", "synonyms": ["mastiff", "english mastiff"]},
+                {"value": "rottweiler", "synonyms": ["rottweiler", "rottie"]},
+
+                # Herding breeds
+                {"value": "border collie", "synonyms": ["border collie", "collie"]},
+                {"value": "australian shepherd", "synonyms": ["australian shepherd", "aussie", "aussies"]},
+                {"value": "shetland sheepdog", "synonyms": ["shetland sheepdog", "sheltie"]},
+                {"value": "corgi", "synonyms": ["corgi", "welsh corgi", "pembroke corgi", "cardigan corgi"]},
+
+                # Toy/Small breeds
+                {"value": "chihuahua", "synonyms": ["chihuahua", "chi"]},
+                {"value": "pomeranian", "synonyms": ["pomeranian", "pom", "poms"]},
+                {"value": "shih tzu", "synonyms": ["shih tzu", "shih-tzu"]},
+                {"value": "maltese", "synonyms": ["maltese"]},
+                {"value": "pug", "synonyms": ["pug", "pugs"]},
+                {"value": "boston terrier", "synonyms": ["boston terrier", "boston"]},
+                {"value": "cavalier king charles spaniel", "synonyms": ["cavalier king charles spaniel", "cavalier", "cavalier spaniel"]},
+
+                # Sporting breeds
+                {"value": "cocker spaniel", "synonyms": ["cocker spaniel", "cocker"]},
+                {"value": "springer spaniel", "synonyms": ["springer spaniel", "english springer spaniel", "springer"]},
+                {"value": "brittany", "synonyms": ["brittany", "brittany spaniel"]},
+                {"value": "pointer", "synonyms": ["pointer", "german shorthaired pointer"]},
+                {"value": "vizsla", "synonyms": ["vizsla"]},
+                {"value": "weimaraner", "synonyms": ["weimaraner"]},
+
+                # Terriers
+                {"value": "jack russell terrier", "synonyms": ["jack russell terrier", "jack russell", "jrt"]},
+                {"value": "bull terrier", "synonyms": ["bull terrier", "bully"]},
+                {"value": "scottish terrier", "synonyms": ["scottish terrier", "scottie"]},
+                {"value": "west highland terrier", "synonyms": ["west highland terrier", "westie"]},
+                {"value": "airedale terrier", "synonyms": ["airedale terrier", "airedale"]},
+
+                # Other popular breeds
+                {"value": "pit bull", "synonyms": ["pit bull", "pitbull", "american pit bull terrier", "staffordshire terrier"]},
+                {"value": "mixed breed", "synonyms": ["mixed breed", "mixed", "mutt", "mix"]},
+                {"value": "unknown", "synonyms": ["unknown", "not sure", "don't know"]}
+            ]
+        )
+
+        # Cat breeds - comprehensive list
+        self.get_or_create_entity_type(
+            "cat_breed",
+            [
+                # Popular breeds
+                {"value": "domestic shorthair", "synonyms": ["domestic shorthair", "dsh", "short hair", "shorthair"]},
+                {"value": "domestic longhair", "synonyms": ["domestic longhair", "dlh", "long hair", "longhair"]},
+                {"value": "domestic medium hair", "synonyms": ["domestic medium hair", "dmh", "medium hair"]},
+                {"value": "persian", "synonyms": ["persian", "persians"]},
+                {"value": "maine coon", "synonyms": ["maine coon", "maine"]},
+                {"value": "siamese", "synonyms": ["siamese", "siamese cat"]},
+                {"value": "ragdoll", "synonyms": ["ragdoll", "rag doll"]},
+                {"value": "bengal", "synonyms": ["bengal", "bengals"]},
+                {"value": "british shorthair", "synonyms": ["british shorthair", "british short hair"]},
+                {"value": "abyssinian", "synonyms": ["abyssinian", "aby"]},
+                {"value": "birman", "synonyms": ["birman", "sacred cat of burma"]},
+                {"value": "sphynx", "synonyms": ["sphynx", "sphinx", "hairless cat"]},
+                {"value": "russian blue", "synonyms": ["russian blue", "russian"]},
+                {"value": "scottish fold", "synonyms": ["scottish fold", "fold"]},
+                {"value": "american shorthair", "synonyms": ["american shorthair", "american short hair"]},
+                {"value": "devon rex", "synonyms": ["devon rex", "devon"]},
+                {"value": "norwegian forest cat", "synonyms": ["norwegian forest cat", "norwegian forest", "wegie"]},
+                {"value": "himalayan", "synonyms": ["himalayan", "himmy"]},
+                {"value": "burmese", "synonyms": ["burmese"]},
+                {"value": "oriental", "synonyms": ["oriental", "oriental shorthair"]},
+                {"value": "manx", "synonyms": ["manx", "manx cat"]},
+                {"value": "cornish rex", "synonyms": ["cornish rex", "cornish"]},
+                {"value": "exotic shorthair", "synonyms": ["exotic shorthair", "exotic"]},
+                {"value": "tonkinese", "synonyms": ["tonkinese", "tonk"]},
+                {"value": "turkish angora", "synonyms": ["turkish angora", "angora"]},
+                {"value": "tabby", "synonyms": ["tabby", "tabby cat"]},
+                {"value": "tuxedo", "synonyms": ["tuxedo", "tuxedo cat"]},
+                {"value": "calico", "synonyms": ["calico", "calico cat"]},
+                {"value": "tortoiseshell", "synonyms": ["tortoiseshell", "tortie"]},
+                {"value": "mixed breed", "synonyms": ["mixed breed", "mixed", "mix"]},
+                {"value": "unknown", "synonyms": ["unknown", "not sure", "don't know"]}
+            ]
+        )
+
         # Pet size
         self.get_or_create_entity_type(
             "pet_size",
@@ -280,38 +383,118 @@ class DialogflowSetup:
             ]
         )
 
+        # Pet owner experience level
+        self.get_or_create_entity_type(
+            "experience_level",
+            [
+                {"value": "no_experience", "synonyms": ["no", "no experience", "never", "first time", "first-time owner", "new to pets", "I'm new", "never had a pet", "never owned", "beginner", "I don't have experience"]},
+                {"value": "some_experience", "synonyms": ["some", "some experience", "a little", "limited", "had pets before", "grew up with pets", "childhood pet", "little bit"]},
+                {"value": "experienced", "synonyms": ["yes", "experienced", "lots of experience", "very experienced", "expert", "had many pets", "owned pets before", "have experience", "I have experience", "plenty"]},
+                {"value": "specific_breed", "synonyms": ["specific breed", "this breed", "same breed", "familiar with breed", "owned this breed", "had this breed before"]}
+            ]
+        )
+
         logger.info("✓ Entity types configured")
 
     def setup_intents(self):
         """Create/update all intents."""
         logger.info("Setting up intents...")
 
-        # Get system entity type path
+        # Get system entity type paths
         sys_any = "projects/-/locations/-/agents/-/entityTypes/sys.any"
+        sys_location = "projects/-/locations/-/agents/-/entityTypes/sys.location"
+
+        # Get custom entity types from cache
+        pet_species_entity = self._entity_types_cache.get("pet_species")
+        pet_species_path = pet_species_entity.name if pet_species_entity else sys_any
+
+        dog_breed_entity = self._entity_types_cache.get("dog_breed")
+        dog_breed_path = dog_breed_entity.name if dog_breed_entity else sys_any
+
+        cat_breed_entity = self._entity_types_cache.get("cat_breed")
+        cat_breed_path = cat_breed_entity.name if cat_breed_entity else sys_any
+
+        experience_level_entity = self._entity_types_cache.get("experience_level")
+        experience_level_path = experience_level_entity.name if experience_level_entity else sys_any
 
         # intent.search_pets with parameter annotations
+        # Include complex, natural sentences that users actually say
         self.get_or_create_intent(
             "intent.search_pets",
             [
+                # Simple patterns
                 [{"text": "I want to adopt a "}, {"text": "dog", "parameter_id": "species"}, {"text": " in "}, {"text": "Seattle", "parameter_id": "location"}],
                 [{"text": "Show me "}, {"text": "cats", "parameter_id": "species"}, {"text": " in "}, {"text": "Portland", "parameter_id": "location"}],
                 [{"text": "I'm looking for a "}, {"text": "puppy", "parameter_id": "species"}],
                 [{"text": "Search for pets in "}, {"text": "Boston", "parameter_id": "location"}],
                 [{"text": "Find me a "}, {"text": "kitten", "parameter_id": "species"}],
+
+                # Breed-specific dog searches
+                [{"text": "I want to adopt a "}, {"text": "golden retriever", "parameter_id": "breed"}, {"text": " in "}, {"text": "Seattle", "parameter_id": "location"}],
+                [{"text": "Looking for a "}, {"text": "labrador", "parameter_id": "breed"}, {"text": " near "}, {"text": "Portland", "parameter_id": "location"}],
+                [{"text": "Show me "}, {"text": "german shepherd", "parameter_id": "breed"}, {"text": "s in "}, {"text": "Boston", "parameter_id": "location"}],
+                [{"text": "I want a "}, {"text": "beagle", "parameter_id": "breed"}],
+                [{"text": "Find me a "}, {"text": "corgi", "parameter_id": "breed"}, {"text": " in "}, {"text": "98101", "parameter_id": "location"}],
+                [{"text": "I'm looking for a "}, {"text": "husky", "parameter_id": "breed"}],
+                [{"text": "Show me "}, {"text": "poodle", "parameter_id": "breed"}, {"text": "s"}],
+                [{"text": "I want to adopt a "}, {"text": "french bulldog", "parameter_id": "breed"}],
+
+                # Breed-specific cat searches
+                [{"text": "Looking for a "}, {"text": "siamese", "parameter_id": "breed"}, {"text": " cat in "}, {"text": "Seattle", "parameter_id": "location"}],
+                [{"text": "I want a "}, {"text": "maine coon", "parameter_id": "breed"}],
+                [{"text": "Show me "}, {"text": "persian", "parameter_id": "breed"}, {"text": " cats"}],
+                [{"text": "I'm looking for a "}, {"text": "bengal", "parameter_id": "breed"}, {"text": " in "}, {"text": "Portland", "parameter_id": "location"}],
+                [{"text": "Find me a "}, {"text": "ragdoll", "parameter_id": "breed"}],
+
+                # Complex patterns with "I live in"
+                [{"text": "I live in "}, {"text": "Seattle", "parameter_id": "location"}, {"text": " and want to adopt a "}, {"text": "dog", "parameter_id": "species"}],
+                [{"text": "I live in "}, {"text": "Portland", "parameter_id": "location"}, {"text": " and I'm looking for a "}, {"text": "cat", "parameter_id": "species"}],
+                [{"text": "I live in "}, {"text": "Boston", "parameter_id": "location"}, {"text": " looking for a "}, {"text": "puppy", "parameter_id": "species"}],
+                [{"text": "I live in "}, {"text": "Seattle", "parameter_id": "location"}, {"text": " and want a "}, {"text": "golden retriever", "parameter_id": "breed"}],
+                [{"text": "I live in "}, {"text": "Portland", "parameter_id": "location"}, {"text": " looking for a "}, {"text": "siamese", "parameter_id": "breed"}, {"text": " cat"}],
+
+                # Complex sentences with extra details (train NLU to extract just location and species/breed)
+                [{"text": "I live in "}, {"text": "Seattle", "parameter_id": "location"}, {"text": " and want to adopt a medium-sized "}, {"text": "dog", "parameter_id": "species"}, {"text": " that's good with cats"}],
+                [{"text": "I'm in "}, {"text": "Portland", "parameter_id": "location"}, {"text": " looking for a friendly "}, {"text": "cat", "parameter_id": "species"}, {"text": " for my apartment"}],
+                [{"text": "I live in "}, {"text": "Boston", "parameter_id": "location"}, {"text": " and need a "}, {"text": "dog", "parameter_id": "species"}, {"text": " suitable for apartment living"}],
+                [{"text": "I live in "}, {"text": "Seattle", "parameter_id": "location"}, {"text": " and want a "}, {"text": "labrador", "parameter_id": "breed"}, {"text": " that's good with children"}],
+
+                # Very complex sentences with multiple descriptors (like the actual user input)
+                [{"text": "I live in "}, {"text": "Seattle", "parameter_id": "location"}, {"text": " and want to adopt a medium-sized "}, {"text": "dog", "parameter_id": "species"}, {"text": " that's good with cats and children"}],
+                [{"text": "I live in "}, {"text": "Portland", "parameter_id": "location"}, {"text": " and want a "}, {"text": "dog", "parameter_id": "species"}, {"text": " suitable for apartment living and low-maintenance"}],
+                [{"text": "I live in "}, {"text": "Boston", "parameter_id": "location"}, {"text": " and want to adopt a "}, {"text": "cat", "parameter_id": "species"}, {"text": " that's good with children, suitable for apartment living, and low-maintenance"}],
+                [{"text": "I live in "}, {"text": "Seattle", "parameter_id": "location"}, {"text": " and want a medium-sized "}, {"text": "labrador", "parameter_id": "breed"}, {"text": " suitable for apartment living first-time owner"}],
+                [{"text": "I'm in "}, {"text": "Portland", "parameter_id": "location"}, {"text": " looking for a friendly "}, {"text": "dog", "parameter_id": "species"}, {"text": " good with cats and children low-maintenance"}],
+                [{"text": "I live in "}, {"text": "98101", "parameter_id": "location"}, {"text": " and want to adopt a "}, {"text": "dog", "parameter_id": "species"}, {"text": " that's suitable for apartment living low-maintenance first-time owner"}],
+
+                # ZIP code patterns
+                [{"text": "I want to adopt a "}, {"text": "dog", "parameter_id": "species"}, {"text": " near "}, {"text": "98101", "parameter_id": "location"}],
+                [{"text": "Show me "}, {"text": "cats", "parameter_id": "species"}, {"text": " in zip code "}, {"text": "97201", "parameter_id": "location"}],
+                [{"text": "Looking for a "}, {"text": "boxer", "parameter_id": "breed"}, {"text": " in "}, {"text": "98101", "parameter_id": "location"}],
+
+                # Location-first patterns
+                [{"text": "In "}, {"text": "Seattle", "parameter_id": "location"}, {"text": " I want to find a "}, {"text": "dog", "parameter_id": "species"}],
+                [{"text": "Looking for a "}, {"text": "cat", "parameter_id": "species"}, {"text": " near "}, {"text": "Portland", "parameter_id": "location"}],
+                [{"text": "In "}, {"text": "Boston", "parameter_id": "location"}, {"text": " show me "}, {"text": "beagle", "parameter_id": "breed"}, {"text": "s"}],
+
+                # Generic search (no parameters)
                 [{"text": "I want to search for a pet"}],
-                [{"text": "Can you help me find a pet"}]
+                [{"text": "Can you help me find a pet"}],
+                [{"text": "Show me available pets"}],
+                [{"text": "I'm looking for a pet to adopt"}]
             ],
             parameters=[
-                {"id": "location", "entity_type": sys_any},
-                {"id": "species", "entity_type": sys_any},
-                {"id": "breed", "entity_type": sys_any}
+                {"id": "location", "entity_type": sys_location},  # Use @sys.location for better location extraction
+                {"id": "species", "entity_type": pet_species_path},  # Use custom pet_species entity
+                {"id": "breed", "entity_type": dog_breed_path}  # Use @dog_breed (most common breed searches are dogs)
             ]
         )
 
-        # intent.get_recommendations with affirmative responses
+        # intent.get_recommendations with affirmative responses and experience mentions
         self.get_or_create_intent(
             "intent.get_recommendations",
             [
+                # Simple affirmatives
                 [{"text": "Yes"}],
                 [{"text": "Yes please"}],
                 [{"text": "Show me recommendations"}],
@@ -326,7 +509,15 @@ class DialogflowSetup:
                 [{"text": "I don't know what pet to get"}],
                 [{"text": "Recommend a pet for my lifestyle"}],
                 [{"text": "Give me recommendations"}],
-                [{"text": "I need help choosing a pet"}]
+                [{"text": "I need help choosing a pet"}],
+
+                # With experience mentioned (will be used to train NLU to recognize experience in complex sentences)
+                [{"text": "Yes, I'm a first-time pet owner"}],
+                [{"text": "Yes, I have experience with pets"}],
+                [{"text": "Yes, I'm new to pets"}],
+                [{"text": "Yes, I've owned pets before"}],
+                [{"text": "Yes, I'm experienced with dogs"}],
+                [{"text": "Sure, I've never had a pet before"}]
             ]
         )
 
@@ -537,29 +728,47 @@ class DialogflowSetup:
         # Pet Search page
         if "Pet Search" not in pages_by_name:
             logger.info("  Creating Pet Search page...")
+
+            # Get custom entity types for page creation
+            pet_species_entity = self._entity_types_cache.get("pet_species")
+            pet_species_path = pet_species_entity.name if pet_species_entity else "projects/-/locations/-/agents/-/entityTypes/sys.any"
+
+            dog_breed_entity = self._entity_types_cache.get("dog_breed")
+            dog_breed_path = dog_breed_entity.name if dog_breed_entity else "projects/-/locations/-/agents/-/entityTypes/sys.any"
+
             pet_search_page = self.pages_client.create_page(
                 parent=flow_name,
                 page=Page(
                     display_name="Pet Search",
-                    form=Page.Form(
+                    form=Form(
                         parameters=[
-                            Page.Form.Parameter(
+                            Form.Parameter(
                                 display_name="location",
-                                entity_type="projects/-/locations/-/agents/-/entityTypes/sys.any",
+                                entity_type="projects/-/locations/-/agents/-/entityTypes/sys.location",
                                 required=True,
-                                fill_behavior=Page.Form.Parameter.FillBehavior(
+                                fill_behavior=Form.Parameter.FillBehavior(
                                     initial_prompt_fulfillment=Fulfillment(
                                         messages=[ResponseMessage(text=ResponseMessage.Text(text=["Where are you located?"]))]
                                     )
                                 )
                             ),
-                            Page.Form.Parameter(
+                            Form.Parameter(
                                 display_name="species",
-                                entity_type="projects/-/locations/-/agents/-/entityTypes/sys.any",
-                                required=True,
-                                fill_behavior=Page.Form.Parameter.FillBehavior(
+                                entity_type=pet_species_path,
+                                required=False,  # Optional since user might specify breed
+                                fill_behavior=Form.Parameter.FillBehavior(
                                     initial_prompt_fulfillment=Fulfillment(
-                                        messages=[ResponseMessage(text=ResponseMessage.Text(text=["What type of pet are you looking for?"]))]
+                                        messages=[ResponseMessage(text=ResponseMessage.Text(text=["What type of pet are you looking for? (dog, cat, etc.)"]))]
+                                    )
+                                )
+                            ),
+                            Form.Parameter(
+                                display_name="breed",
+                                entity_type=dog_breed_path,
+                                required=False,
+                                fill_behavior=Form.Parameter.FillBehavior(
+                                    initial_prompt_fulfillment=Fulfillment(
+                                        messages=[ResponseMessage(text=ResponseMessage.Text(text=["Any specific breed in mind? (optional)"]))]
                                     )
                                 )
                             )
@@ -579,40 +788,76 @@ class DialogflowSetup:
                     ]
                 )
             )
-            logger.info("  ✓ Pet Search page created")
+            logger.info("  ✓ Pet Search page created with location (@sys.location), species (@pet_species), breed (@dog_breed)")
         else:
             # Update existing page to ensure webhook route is configured
-            logger.info("  Updating Pet Search page with webhook route...")
-            pet_search_page = pages_by_name["Pet Search"]
+            logger.info("  Updating Pet Search page with form parameters and webhook route...")
+            old_page = pages_by_name["Pet Search"]
 
-            # Clear entry_fulfillment to prevent double webhook calls
-            # The webhook should ONLY be called when form is complete, not when entering the page
-            pet_search_page.entry_fulfillment = Fulfillment()
+            # Get custom entity types
+            pet_species_entity = self._entity_types_cache.get("pet_species")
+            pet_species_path = pet_species_entity.name if pet_species_entity else "projects/-/locations/-/agents/-/entityTypes/sys.any"
 
-            # Clear all page-level event handlers to prevent interference
-            event_handler_count = len(pet_search_page.event_handlers)
-            pet_search_page.event_handlers.clear()
-            if event_handler_count > 0:
-                logger.info(f"  Cleared {event_handler_count} page-level event handler(s) from Pet Search")
+            dog_breed_entity = self._entity_types_cache.get("dog_breed")
+            dog_breed_path = dog_breed_entity.name if dog_breed_entity else "projects/-/locations/-/agents/-/entityTypes/sys.any"
 
-            # Update transition routes to ensure webhook is called when form is complete
-            pet_search_page.transition_routes.clear()
-            pet_search_page.transition_routes.append(
-                TransitionRoute(
-                    condition="$page.params.status = \"FINAL\"",
-                    trigger_fulfillment=Fulfillment(
-                        webhook=webhook_name,
-                        tag="search-pets"
-                    ) if webhook_name else Fulfillment(
-                        messages=[ResponseMessage(text=ResponseMessage.Text(text=["Searching for pets..."]))]
+            # Create a brand new Page object with all the configuration
+            # This avoids protobuf nested type issues when modifying existing objects
+            pet_search_page = Page(
+                name=old_page.name,  # Preserve the page path so API knows which page to update
+                display_name="Pet Search",
+                form=Form(
+                    parameters=[
+                        Form.Parameter(
+                            display_name="location",
+                            entity_type="projects/-/locations/-/agents/-/entityTypes/sys.location",
+                            required=True,
+                            fill_behavior=Form.Parameter.FillBehavior(
+                                initial_prompt_fulfillment=Fulfillment(
+                                    messages=[ResponseMessage(text=ResponseMessage.Text(text=["Where are you located?"]))]
+                                )
+                            )
+                        ),
+                        Form.Parameter(
+                            display_name="species",
+                            entity_type=pet_species_path,
+                            required=False,  # Optional since user might specify breed instead
+                            fill_behavior=Form.Parameter.FillBehavior(
+                                initial_prompt_fulfillment=Fulfillment(
+                                    messages=[ResponseMessage(text=ResponseMessage.Text(text=["What type of pet are you looking for? (dog, cat, etc.)"]))]
+                                )
+                            )
+                        ),
+                        Form.Parameter(
+                            display_name="breed",
+                            entity_type=dog_breed_path,
+                            required=False,
+                            fill_behavior=Form.Parameter.FillBehavior(
+                                initial_prompt_fulfillment=Fulfillment(
+                                    messages=[ResponseMessage(text=ResponseMessage.Text(text=["Any specific breed in mind? (optional)"]))]
+                                )
+                            )
+                        )
+                    ]
+                ),
+                entry_fulfillment=Fulfillment(),  # Clear to prevent double webhook calls
+                transition_routes=[
+                    TransitionRoute(
+                        condition="$page.params.status = \"FINAL\"",
+                        trigger_fulfillment=Fulfillment(
+                            webhook=webhook_name,
+                            tag="search-pets"
+                        ) if webhook_name else Fulfillment(
+                            messages=[ResponseMessage(text=ResponseMessage.Text(text=["Searching for pets..."]))]
+                        )
                     )
-                    # No target specified - let webhook response control the flow
-                )
+                ]
             )
+            logger.info("  Created new Page object with form parameters and webhook route")
 
             # Update the page
             self.pages_client.update_page(page=pet_search_page)
-            logger.info("  ✓ Pet Search page updated (cleared entry fulfillment, set webhook route)")
+            logger.info("  ✓ Pet Search page updated (form parameters, cleared entry fulfillment, set webhook route)")
 
         # Get Recommendations page
         # Get housing_type entity
@@ -628,23 +873,23 @@ class DialogflowSetup:
                 parent=flow_name,
                 page=Page(
                     display_name="Get Recommendations",
-                    form=Page.Form(
+                    form=Form(
                         parameters=[
-                            Page.Form.Parameter(
+                            Form.Parameter(
                                 display_name="housing",
                                 entity_type=housing_entity_path,
                                 required=True,
-                                fill_behavior=Page.Form.Parameter.FillBehavior(
+                                fill_behavior=Form.Parameter.FillBehavior(
                                     initial_prompt_fulfillment=Fulfillment(
                                         messages=[ResponseMessage(text=ResponseMessage.Text(text=["What type of housing do you have? (apartment, house, condo, etc.)"]))]
                                     )
                                 )
                             ),
-                            Page.Form.Parameter(
+                            Form.Parameter(
                                 display_name="experience",
                                 entity_type="projects/-/locations/-/agents/-/entityTypes/sys.any",
                                 required=True,
-                                fill_behavior=Page.Form.Parameter.FillBehavior(
+                                fill_behavior=Form.Parameter.FillBehavior(
                                     initial_prompt_fulfillment=Fulfillment(
                                         messages=[ResponseMessage(text=ResponseMessage.Text(text=["Do you have experience with pets?"]))]
                                     )
@@ -688,7 +933,10 @@ class DialogflowSetup:
             # Configure experience parameter if it exists
             if len(get_rec_page.form.parameters) >= 2:
                 experience_param = get_rec_page.form.parameters[1]
-                experience_param.entity_type = "projects/-/locations/-/agents/-/entityTypes/sys.any"
+                # Get experience_level entity from cache
+                experience_level_entity = self._entity_types_cache.get("experience_level")
+                experience_level_path = experience_level_entity.name if experience_level_entity else "projects/-/locations/-/agents/-/entityTypes/sys.any"
+                experience_param.entity_type = experience_level_path
                 experience_param.display_name = "experience"
                 experience_param.required = True
                 # Update the fill_behavior prompt
@@ -941,8 +1189,8 @@ def main():
         logger.info("╚════════════════════════════════════════╝")
         logger.info("")
         logger.info("✅ What was configured:")
-        logger.info("  • Entity types (housing, species, size, age)")
-        logger.info("  • Intents with parameter annotations")
+        logger.info("  • Entity types (housing, experience_level, species, dog_breed, cat_breed, size, age)")
+        logger.info("  • Intents with parameter annotations (species + breed + experience)")
         logger.info("  • Pages (Pet Search, Get Recommendations)")
         logger.info("  • Transition routes at flow level")
         logger.info("  • Webhook configuration")
@@ -955,8 +1203,9 @@ def main():
         logger.info("")
         logger.info("🧪 Test in Dialogflow CX Simulator:")
         logger.info("  1. 'I want to adopt a dog in Seattle'")
-        logger.info("  2. 'Yes please show me recommendations'")
-        logger.info("  3. 'apartment' (when asked about housing)")
+        logger.info("  2. 'I want to adopt a golden retriever in Portland' (breed-specific)")
+        logger.info("  3. 'Yes please show me recommendations'")
+        logger.info("  4. 'apartment' (when asked about housing)")
         logger.info("")
         sys.exit(0)
     else:
