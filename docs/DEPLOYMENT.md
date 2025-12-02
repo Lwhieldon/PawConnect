@@ -854,54 +854,41 @@ Dialogflow CX provides the conversational interface for PawConnect AI.
 
 ### Step 2: Configure Dialogflow CX Agent
 
-PawConnect provides configuration files and automation scripts to help you configure your Dialogflow CX agent.
+PawConnect provides a single, simple script to configure your entire Dialogflow CX agent.
 
 **What You'll Create:**
 - 7 intents (search pets, recommendations, scheduling, applications, etc.)
 - 4 custom entity types (housing type, pet species, pet size, pet age group)
-- 6 pages with form parameters
-- Conversation flows and transitions
+- Pages and flows with proper transition routes
 - Webhook integration
-- Training phrases for natural language understanding
+- Training phrases with parameter annotations
+- Welcome message
 
-**Setup Options:**
-
-#### Option A: Full Python Automation with Parameter Fix (Recommended) ⭐
-
-**⚠️ CRITICAL for Production:** Use this option to ensure proper parameter extraction from user utterances.
+**Simple Setup (ONE Command):**
 
 ```bash
 # 1. Authenticate with Google Cloud
 gcloud auth application-default login
 
-# 2. Get your agent ID using the REST API
-# Note: gcloud dialogflow commands don't exist - use REST API instead
-curl -s \
-  -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" \
-  -H "x-goog-user-project: $PROJECT_ID" \
-  "https://$REGION-dialogflow.googleapis.com/v3/projects/$PROJECT_ID/locations/$REGION/agents"
-
-# Alternative: Open Dialogflow CX Console in browser
-# Windows: start https://dialogflow.cloud.google.com/cx/projects/$PROJECT_ID/locations/$REGION/agents
-# Mac/Linux: open https://dialogflow.cloud.google.com/cx/projects/$PROJECT_ID/locations/$REGION/agents
-
-# 3. Install Python dependencies (if not already installed)
+# 2. Install Python dependencies (if not already installed)
 pip install google-cloud-dialogflow-cx loguru
 
-# 4. Run the COMPLETE fix script (includes all setup + parameter extraction fix)
-python deployment/dialogflow/fix_parameter_extraction.py \
+# 3. Run the setup script (auto-detects agent ID)
+python deployment/dialogflow/setup_agent.py \
+  --project-id $PROJECT_ID
+
+# Optional: Include webhook URL if already deployed
+python deployment/dialogflow/setup_agent.py \
   --project-id $PROJECT_ID \
-  --agent-id YOUR_AGENT_ID \
-  --location $REGION \
   --webhook-url https://your-webhook-url/webhook
 ```
 
 **What this creates:**
-- ✅ 4 entity types
+- ✅ 4 entity types (housing_type, pet_species, pet_size, pet_age_group)
 - ✅ 7 intents with **parameter-annotated** training phrases
-- ✅ 1 webhook configuration
-- ✅ 6 pages with form parameters
-- ✅ Updated START_PAGE with welcome message
+- ✅ Webhook configuration (if URL provided)
+- ✅ Pages with form parameters
+- ✅ START_PAGE with welcome message
 - ✅ Transition routes with **parameter presets**
 - ✅ Flow restart logic to prevent conversation loops
 - ✅ **CRITICAL:** Parameter extraction from initial user utterance
@@ -909,56 +896,25 @@ python deployment/dialogflow/fix_parameter_extraction.py \
 **Why this is critical:**
 - Without parameter extraction, users get frustrated by repetitive questions
 - Example: User says "I want to adopt a dog in Seattle" but agent asks "Where do you live?"
-- This fix ensures location and species are extracted automatically from the first message
+- The script ensures location and species are extracted automatically from the first message
 
-**Manual steps still needed:**
-- Test in Dialogflow Simulator
-- Fine-tune any edge cases
-
-#### Option B: Bash Script Only (Intents & Entities)
-
-Use the bash script if you only want to automate entity types and intents:
+**Verify Configuration:**
 
 ```bash
-# 1. Set quota project for API calls (required for Dialogflow API)
-gcloud auth application-default set-quota-project $PROJECT_ID
-
-# 2. Get your agent ID (see Option A for how to get this)
-
-# 3. Run the setup script with your agent ID
-chmod +x deployment/dialogflow/setup-agent.sh
-./deployment/dialogflow/setup-agent.sh YOUR_AGENT_ID $REGION $PROJECT_ID
+# Run verification script to confirm everything is configured correctly
+python deployment/dialogflow/verify_fixes.py \
+  --project-id $PROJECT_ID \
+  --agent-id YOUR_AGENT_ID
 ```
 
-**What this creates:**
-- ✅ 4 entity types
-- ✅ 7 intents with training phrases
+**Manual Option:**
 
-**What you need to create:**
-- Pages and conversation flows (use Option A or create manually)
-- Webhook configuration
-- Page parameters and transitions
+If you prefer full control, follow the step-by-step guide in **[deployment/dialogflow/README.md](../deployment/dialogflow/README.md)**
 
-#### Option C: Manual Setup (Full Control)
-
-Follow the step-by-step guide in **[deployment/dialogflow/README.md](../deployment/dialogflow/README.md)** to manually create:
-- Entity types in the Console
-- Intents with training phrases
-- Pages with form parameters
-- Webhook configuration
-- Page transitions
-
-**📖 Complete setup instructions:**
-- **[deployment/dialogflow/README.md](../deployment/dialogflow/README.md)** - Detailed setup guide including Python automation
+**📖 Additional Resources:**
+- **[deployment/dialogflow/README.md](../deployment/dialogflow/README.md)** - Detailed setup guide
 - **[deployment/dialogflow/agent-config.yaml](../deployment/dialogflow/agent-config.yaml)** - Reference configuration
 - **[deployment/dialogflow/CONVERSATION_FLOW.md](../deployment/dialogflow/CONVERSATION_FLOW.md)** - Visual conversation flows
-
-**🐍 Python Automation Scripts:**
-- **[fix_parameter_extraction.py](../deployment/dialogflow/fix_parameter_extraction.py)** ⭐ **RECOMMENDED** - Complete setup with parameter extraction fix
-- **[setup_complete_automation.py](../deployment/dialogflow/setup_complete_automation.py)** - Complete agent setup (without parameter fix)
-- **[setup_dialogflow_automation.py](../deployment/dialogflow/setup_dialogflow_automation.py)** - Pages, flows, and webhooks only
-- **[update_intent_parameters.py](../deployment/dialogflow/update_intent_parameters.py)** - Add parameter annotations to intents
-- **[add_transition_routes.py](../deployment/dialogflow/add_transition_routes.py)** - Add transition routes with intent matchers
 
 ### Step 3: Configure Webhook (After Deployment)
 
