@@ -5,7 +5,7 @@ User profile and preferences data models.
 from datetime import datetime
 from enum import Enum
 from typing import Optional, List
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, ConfigDict
 
 
 class HomeType(str, Enum):
@@ -141,10 +141,11 @@ class UserPreferences(BaseModel):
         description="Minutes per day can commit to exercise"
     )
 
-    @validator("children_ages")
-    def validate_children_ages(cls, v, values):
+    @field_validator("children_ages")
+    @classmethod
+    def validate_children_ages(cls, v, info):
         """Validate children ages are provided when has_children is True."""
-        if values.get("has_children") and not v:
+        if info.data.get("has_children") and not v:
             raise ValueError("children_ages required when has_children is True")
         return v
 
@@ -193,8 +194,8 @@ class UserProfile(BaseModel):
         description="IDs of submitted applications"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "user_id": "user_12345",
                 "email": "john.doe@example.com",
@@ -214,3 +215,4 @@ class UserProfile(BaseModel):
                 "is_adopter": True
             }
         }
+    )

@@ -91,6 +91,10 @@ class PetSearchAgent:
         **kwargs
     ) -> List[Pet]:
         """Search RescueGroups API for pets."""
+        # Return mock data in testing/mock mode
+        if settings.testing_mode or settings.mock_apis:
+            return self._get_mock_pets(pet_type, limit)
+
         try:
             # Make API request
             response = await self.rescuegroups.search_pets(
@@ -101,8 +105,8 @@ class PetSearchAgent:
                 **kwargs
             )
 
-            # Parse response into Pet objects
-            pet_data_list = parse_rescuegroups_response(response)
+            # Parse response into Pet objects, passing pet_type and limit for correct filtering
+            pet_data_list = parse_rescuegroups_response(response, pet_type=pet_type, limit=limit)
 
             pets = []
             for pet_data in pet_data_list:
@@ -253,10 +257,14 @@ class PetSearchAgent:
             response = await self.rescuegroups.get_pet(external_id)
 
             # Parse response
-            pet_data_list = parse_rescuegroups_response(response)
+            pet_data_list = parse_rescuegroups_response(response, limit=1)
 
             if pet_data_list:
-                return Pet(**pet_data_list[0])
+                try:
+                    return Pet(**pet_data_list[0])
+                except Exception as e:
+                    logger.warning(f"Failed to create Pet object for pet_id {pet_id}: {e}")
+                    return None
 
             return None
 

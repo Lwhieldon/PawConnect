@@ -1,0 +1,218 @@
+# PawConnect Dialogflow CX Agent Configuration Reference
+# This file describes the agent structure for manual setup or reference
+# Use this as a guide when configuring your agent in the Dialogflow CX Console
+
+agent:
+  displayName: "PawConnect AI"
+  defaultLanguageCode: "en"
+  timeZone: "America/New_York"
+  description: "PawConnect AI conversational agent for pet adoption and fostering"
+
+# Entity Types to create
+entityTypes:
+  - displayName: "pet_species"
+    kind: "KIND_MAP"
+    entities:
+      - value: "dog"
+        synonyms: ["dog", "dogs", "puppy", "puppies", "canine"]
+      - value: "cat"
+        synonyms: ["cat", "cats", "kitten", "kittens", "feline"]
+      - value: "rabbit"
+        synonyms: ["rabbit", "rabbits", "bunny", "bunnies"]
+      - value: "bird"
+        synonyms: ["bird", "birds", "parrot", "parakeet"]
+      - value: "small_animal"
+        synonyms: ["hamster", "guinea pig", "ferret", "small animal"]
+
+  - displayName: "pet_size"
+    kind: "KIND_MAP"
+    entities:
+      - value: "small"
+        synonyms: ["small", "tiny", "little", "miniature"]
+      - value: "medium"
+        synonyms: ["medium", "average", "mid-sized"]
+      - value: "large"
+        synonyms: ["large", "big", "giant", "huge"]
+
+  - displayName: "pet_age_group"
+    kind: "KIND_MAP"
+    entities:
+      - value: "baby"
+        synonyms: ["baby", "newborn", "infant", "very young"]
+      - value: "young"
+        synonyms: ["young", "puppy", "kitten", "juvenile"]
+      - value: "adult"
+        synonyms: ["adult", "mature", "grown"]
+      - value: "senior"
+        synonyms: ["senior", "elderly", "old", "older"]
+
+  - displayName: "housing_type"
+    kind: "KIND_MAP"
+    entities:
+      - value: "own"
+        synonyms: ["own", "owner", "homeowner", "I own"]
+      - value: "rent"
+        synonyms: ["rent", "renter", "renting", "I rent", "lease"]
+      - value: "live_with_family"
+        synonyms: ["live with family", "parents", "family home", "relatives"]
+
+# Intents to create
+intents:
+  - displayName: "intent.search_pets"
+    trainingPhrases:
+      - "I want to search for a pet"
+      - "Show me available dogs"
+      - "I'm looking for a cat to adopt"
+      - "Can you help me find a pet"
+      - "Search for pets near me"
+      - "Find me a puppy"
+      - "I'm looking for a rescue animal"
+      - "Show me cats available for adoption"
+
+  - displayName: "intent.get_recommendations"
+    trainingPhrases:
+      - "What pet would be good for me"
+      - "Can you recommend a pet"
+      - "Which pet should I adopt"
+      - "Help me find the right pet"
+      - "I don't know what pet to get"
+      - "Recommend a pet for my lifestyle"
+      - "What's a good match for me"
+
+  - displayName: "intent.schedule_visit"
+    trainingPhrases:
+      - "I want to schedule a visit"
+      - "Can I meet the pet"
+      - "Schedule a time to see the pet"
+      - "I'd like to visit the shelter"
+      - "Book a visit"
+      - "Set up an appointment"
+      - "When can I meet the pet"
+
+  - displayName: "intent.adoption_application"
+    trainingPhrases:
+      - "I want to adopt"
+      - "Start adoption application"
+      - "Apply to adopt this pet"
+      - "I'd like to adopt"
+      - "Begin adoption process"
+      - "Submit adoption application"
+      - "I want to take this pet home"
+
+  - displayName: "intent.foster_application"
+    trainingPhrases:
+      - "I want to foster"
+      - "Start foster application"
+      - "Apply to foster this pet"
+      - "I'd like to foster"
+      - "Begin fostering process"
+      - "Can I foster temporarily"
+      - "I want to be a foster parent"
+
+  - displayName: "intent.search_more"
+    trainingPhrases:
+      - "Show me more pets"
+      - "Search again"
+      - "Find other pets"
+      - "Look for different pets"
+      - "Start a new search"
+      - "See other options"
+
+  - displayName: "intent.ask_question"
+    trainingPhrases:
+      - "What do I need to know about Golden Retrievers"
+      - "Tell me about cat care"
+      - "How much exercise does a dog need"
+      - "What should I prepare before adopting"
+      - "Are there adoption fees"
+      - "What's the adoption process"
+      - "I have a question about pets"
+
+# Webhook configuration
+webhook:
+  displayName: "PawConnect Webhook"
+  timeout: "30s"
+  url: "https://YOUR-CLOUD-RUN-URL/webhook"
+  # Update this URL after deploying your Cloud Run service
+
+# Flow structure (simplified - create these in Console)
+flows:
+  - name: "Default Start Flow"
+    pages:
+      - displayName: "START_PAGE"
+        entryFulfillment:
+          messages:
+            - text: "Hello! I'm PawConnect AI, your personal pet adoption assistant. I can help you search for pets, get personalized recommendations, schedule shelter visits, and submit adoption or foster applications. How can I help you today?"
+
+      - displayName: "Pet Search"
+        description: "Collect search criteria"
+        webhook: "PawConnect Webhook"
+        webhookTag: "search-pets"
+        parameters:
+          - name: "species"
+            type: "@pet_species"
+            prompt: "What species are you interested in?"
+          - name: "breed"
+            type: "@sys.any"
+            prompt: "Do you have a specific breed in mind?"
+          - name: "location"
+            type: "@sys.any"
+            prompt: "What location are you searching in?"
+
+      - displayName: "Pet Details"
+        description: "Validate pet ID"
+        webhook: "PawConnect Webhook"
+        webhookTag: "validate-pet-id"
+        parameters:
+          - name: "pet_id"
+            type: "@sys.any"
+            required: true
+            prompt: "Please provide the pet ID"
+
+      - displayName: "Schedule Visit"
+        description: "Collect visit information"
+        webhook: "PawConnect Webhook"
+        webhookTag: "schedule-visit"
+        parameters:
+          - name: "visit_date"
+            type: "@sys.date"
+            required: true
+            prompt: "What date would you like to schedule your visit?"
+          - name: "visit_time"
+            type: "@sys.time"
+            required: true
+            prompt: "What time works best for you?"
+          - name: "visitor_name"
+            type: "@sys.any"
+            required: true
+            prompt: "May I have your full name?"
+          - name: "visitor_email"
+            type: "@sys.any"
+            required: true
+            redact: true
+            prompt: "What's your email address?"
+          - name: "visitor_phone"
+            type: "@sys.phone-number"
+            required: true
+            redact: true
+            prompt: "What's your phone number?"
+
+      - displayName: "Adoption Application"
+        description: "Collect adoption application"
+        webhook: "PawConnect Webhook"
+        webhookTag: "submit-application"
+        # (Additional parameters omitted for brevity)
+
+      - displayName: "Foster Application"
+        description: "Collect foster application"
+        webhook: "PawConnect Webhook"
+        webhookTag: "submit-application"
+        # (Additional parameters omitted for brevity)
+
+# Webhook tags used in the application
+webhookTags:
+  - "search-pets": "Search for available pets"
+  - "validate-pet-id": "Validate and fetch pet details"
+  - "get-recommendations": "Get personalized pet recommendations"
+  - "schedule-visit": "Schedule a shelter visit"
+  - "submit-application": "Submit adoption or foster application"

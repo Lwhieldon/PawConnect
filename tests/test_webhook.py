@@ -6,6 +6,7 @@ Tests the webhook endpoints with sample Dialogflow requests.
 import asyncio
 import json
 from typing import Dict, Any
+import pytest
 
 
 # Sample Dialogflow CX request for pet ID validation
@@ -49,6 +50,7 @@ SAMPLE_SEARCH_PETS_REQUEST = {
 }
 
 
+@pytest.mark.asyncio
 async def test_webhook_locally():
     """
     Test the webhook running locally.
@@ -58,47 +60,50 @@ async def test_webhook_locally():
 
     webhook_url = "http://localhost:8080/webhook"
 
-    async with aiohttp.ClientSession() as session:
-        # Test health check
-        print("Testing health check...")
-        async with session.get("http://localhost:8080/health") as response:
-            health_data = await response.json()
-            print(f"✓ Health check: {health_data}")
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Test health check
+            print("Testing health check...")
+            async with session.get("http://localhost:8080/health") as response:
+                health_data = await response.json()
+                print(f"✓ Health check: {health_data}")
+                print()
+
+            # Test pet ID validation
+            print("Testing pet ID validation webhook...")
+            print(f"Request: {json.dumps(SAMPLE_VALIDATE_PET_REQUEST, indent=2)}")
             print()
 
-        # Test pet ID validation
-        print("Testing pet ID validation webhook...")
-        print(f"Request: {json.dumps(SAMPLE_VALIDATE_PET_REQUEST, indent=2)}")
-        print()
+            async with session.post(webhook_url, json=SAMPLE_VALIDATE_PET_REQUEST) as response:
+                response_data = await response.json()
+                print(f"Response: {json.dumps(response_data, indent=2)}")
+                print()
 
-        async with session.post(webhook_url, json=SAMPLE_VALIDATE_PET_REQUEST) as response:
-            response_data = await response.json()
-            print(f"Response: {json.dumps(response_data, indent=2)}")
+                # Extract response text
+                messages = response_data.get("fulfillmentResponse", {}).get("messages", [])
+                if messages:
+                    response_text = messages[0].get("text", {}).get("text", [""])[0]
+                    print(f"Agent says: {response_text}")
+                print()
+
+            # Test search pets
+            print("Testing search pets webhook...")
+            print(f"Request: {json.dumps(SAMPLE_SEARCH_PETS_REQUEST, indent=2)}")
             print()
 
-            # Extract response text
-            messages = response_data.get("fulfillmentResponse", {}).get("messages", [])
-            if messages:
-                response_text = messages[0].get("text", {}).get("text", [""])[0]
-                print(f"Agent says: {response_text}")
-            print()
+            async with session.post(webhook_url, json=SAMPLE_SEARCH_PETS_REQUEST) as response:
+                response_data = await response.json()
+                print(f"Response: {json.dumps(response_data, indent=2)}")
+                print()
 
-        # Test search pets
-        print("Testing search pets webhook...")
-        print(f"Request: {json.dumps(SAMPLE_SEARCH_PETS_REQUEST, indent=2)}")
-        print()
-
-        async with session.post(webhook_url, json=SAMPLE_SEARCH_PETS_REQUEST) as response:
-            response_data = await response.json()
-            print(f"Response: {json.dumps(response_data, indent=2)}")
-            print()
-
-            # Extract response text
-            messages = response_data.get("fulfillmentResponse", {}).get("messages", [])
-            if messages:
-                response_text = messages[0].get("text", {}).get("text", [""])[0]
-                print(f"Agent says: {response_text}")
-            print()
+                # Extract response text
+                messages = response_data.get("fulfillmentResponse", {}).get("messages", [])
+                if messages:
+                    response_text = messages[0].get("text", {}).get("text", [""])[0]
+                    print(f"Agent says: {response_text}")
+                print()
+    except (aiohttp.ClientConnectorError, ConnectionRefusedError, OSError) as e:
+        pytest.skip(f"Webhook server not running at localhost:8080. Start server with: python -m pawconnect_ai.dialogflow_webhook")
 
 
 def test_webhook_request_format():

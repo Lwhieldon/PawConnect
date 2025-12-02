@@ -141,13 +141,13 @@ Create custom entity types for better NLP understanding.
 
 ---
 
-#### 1. Pet Type Entity
+#### 1. Pet Species Entity
 
 1. Click **Create**
 2. Configure:
 
 ```yaml
-Display name: pet-type
+Display name: pet_species
 Entity entries:
   - dog
     Synonyms: dog, dogs, puppy, puppies, canine, pup
@@ -157,13 +157,12 @@ Entity entries:
     Synonyms: rabbit, rabbits, bunny, bunnies
   - bird
     Synonyms: bird, birds, parrot, parakeet, cockatiel
-  - small_furry
+  - small_animal
     Synonyms: hamster, guinea pig, gerbil, ferret, small pet
 ```
 
 3. Advanced options:
    - ✅ Enable fuzzy matching
-   - ✅ Enable redact in log
 4. Click **Save**
 
 ---
@@ -174,14 +173,14 @@ Entity entries:
 2. Configure:
 
 ```yaml
-Display name: pet-size
+Display name: pet_size
 Entity entries:
   - small
-    Synonyms: small, tiny, little, petite, compact
+    Synonyms: small, tiny, little, miniature
   - medium
-    Synonyms: medium, mid-size, average, moderate
+    Synonyms: medium, average, mid-sized
   - large
-    Synonyms: large, big, sizeable
+    Synonyms: large, big, giant, huge
   - extra_large
     Synonyms: extra large, xl, giant, huge, very large
 ```
@@ -191,22 +190,22 @@ Entity entries:
 
 ---
 
-#### 3. Pet Age Entity
+#### 3. Pet Age Group Entity
 
 1. Click **Create**
 2. Configure:
 
 ```yaml
-Display name: pet-age
+Display name: pet_age_group
 Entity entries:
   - baby
-    Synonyms: baby, puppy, kitten, newborn, infant
+    Synonyms: baby, newborn, infant
   - young
-    Synonyms: young, juvenile, adolescent, teenager
+    Synonyms: young, puppy, kitten, juvenile
   - adult
     Synonyms: adult, mature, grown
   - senior
-    Synonyms: senior, elderly, old, aged
+    Synonyms: senior, elderly, old, older
 ```
 
 3. ✅ Enable fuzzy matching
@@ -214,41 +213,28 @@ Entity entries:
 
 ---
 
-#### 4. Pet ID Entity
+#### 4. Housing Type Entity
 
 1. Click **Create**
 2. Configure:
 
 ```yaml
-Display name: pet-id
+Display name: housing_type
 Entity entries:
-  - 12345
-    Synonyms: 12345, #12345, pet 12345, pet-12345
-  - abc789
-    Synonyms: abc789, #abc789, pet abc789
-  - (Add more example IDs from RescueGroups)
+  - own
+    Synonyms: own, owner, homeowner, I own
+  - rent
+    Synonyms: rent, renter, renting, I rent, lease
+  - live_with_family
+    Synonyms: live with family, parents, family home
 ```
 
-3. Advanced options:
-   - ✅ Enable fuzzy matching
-   - ✅ Enable redact in log (for privacy)
+3. ✅ Enable fuzzy matching
 4. Click **Save**
 
 ---
 
-#### 5. Location Entity (Optional)
-
-You can use `@sys.geo-city` or create custom:
-
-```yaml
-Display name: location
-Entity entries:
-  - seattle
-    Synonyms: Seattle, Seattle WA, Seattle Washington
-  - 98101
-    Synonyms: 98101, zip 98101
-  - (Add your target locations)
-```
+**Note on Pet IDs and Locations:** For pet IDs and locations, use system entities (`@sys.any` for pet IDs, `@sys.geo-city` for locations) rather than custom entity types
 
 ---
 
@@ -260,7 +246,7 @@ Create intents that recognize user utterances.
 
 ---
 
-#### 1. search.pets Intent
+#### 1. intent.search_pets Intent
 
 **Purpose:** User wants to search for pets
 
@@ -268,7 +254,7 @@ Create intents that recognize user utterances.
 2. Configure:
 
 ```yaml
-Display name: search.pets
+Display name: intent.search_pets
 Description: User wants to search for available pets
 ```
 
@@ -298,15 +284,15 @@ Looking for a rescue dog
 ```
 
 4. **Annotate parameters** in training phrases:
-   - Highlight `dog`, `cat`, `kitten` → Entity: `@pet-type`, Parameter: `pet_type`
+   - Highlight `dog`, `cat`, `kitten` → Entity: `@pet_species`, Parameter: `pet_type`
    - Highlight `Seattle`, `98101` → Entity: `@sys.geo-city`, Parameter: `location`
-   - Highlight `small` → Entity: `@pet-size`, Parameter: `pet_size`
+   - Highlight `small` → Entity: `@pet_size`, Parameter: `pet_size`
 
 5. Click **Save**
 
 ---
 
-#### 2. validate.pet.id Intent
+#### 2. intent.validate_pet_id Intent
 
 **Purpose:** User provides a pet ID to learn more
 
@@ -314,7 +300,7 @@ Looking for a rescue dog
 2. Configure:
 
 ```yaml
-Display name: validate.pet.id
+Display name: intent.validate_pet_id
 Description: User wants to validate and learn about a specific pet ID
 ```
 
@@ -344,13 +330,13 @@ Show details for pet number 789
 ```
 
 4. **Annotate parameters**:
-   - Highlight pet IDs (12345, abc789, etc.) → Entity: `@pet-id`, Parameter: `pet_id`
+   - Highlight pet IDs (12345, abc789, etc.) → Entity: `@sys.any`, Parameter: `pet_id`
 
 5. Click **Save**
 
 ---
 
-#### 3. schedule.visit Intent
+#### 3. intent.schedule_visit Intent
 
 **Purpose:** User wants to schedule a visit
 
@@ -358,7 +344,7 @@ Show details for pet number 789
 2. Configure:
 
 ```yaml
-Display name: schedule.visit
+Display name: intent.schedule_visit
 Description: User wants to schedule a visit to meet a pet
 ```
 
@@ -395,7 +381,7 @@ I want to meet the pet this weekend
 
 ---
 
-#### 4. schedule.visit.with.pet.id Intent
+#### 4. intent.schedule_visit_with_pet_id Intent
 
 **Purpose:** User wants to schedule a visit for a specific pet ID
 
@@ -403,7 +389,7 @@ I want to meet the pet this weekend
 2. Configure:
 
 ```yaml
-Display name: schedule.visit.with.pet.id
+Display name: intent.schedule_visit_with_pet_id
 Description: User wants to schedule a visit for a specific pet by ID
 ```
 
@@ -433,7 +419,7 @@ Visit pet DOG789 this Saturday at 2pm
 ```
 
 4. **Annotate parameters**:
-   - Pet IDs → Entity: `@pet-id`, Parameter: `pet_id`
+   - Pet IDs → Entity: `@sys.any`, Parameter: `pet_id`
    - Dates → Entity: `@sys.date`, Parameter: `date`
    - Times → Entity: `@sys.time`, Parameter: `time`
 
@@ -441,7 +427,7 @@ Visit pet DOG789 this Saturday at 2pm
 
 ---
 
-#### 5. submit.application Intent
+#### 5. intent.submit_application Intent
 
 **Purpose:** User wants to submit adoption application
 
@@ -449,7 +435,7 @@ Visit pet DOG789 this Saturday at 2pm
 2. Configure:
 
 ```yaml
-Display name: submit.application
+Display name: intent.submit_application
 Description: User wants to submit an adoption or foster application
 ```
 
@@ -482,7 +468,7 @@ I want to complete an adoption application
 
 ---
 
-#### 6. get.recommendations Intent
+#### 6. intent.get_recommendations Intent
 
 **Purpose:** User wants personalized pet recommendations
 
@@ -490,7 +476,7 @@ I want to complete an adoption application
 2. Configure:
 
 ```yaml
-Display name: get.recommendations
+Display name: intent.get_recommendations
 Description: User wants personalized pet recommendations based on preferences
 ```
 
@@ -523,7 +509,7 @@ Give me pet recommendations
 
 ---
 
-#### 7. provide.location Intent
+#### 7. intent.provide_location Intent
 
 **Purpose:** User provides their location
 
@@ -531,7 +517,7 @@ Give me pet recommendations
 2. Configure:
 
 ```yaml
-Display name: provide.location
+Display name: intent.provide_location
 Description: User provides their location for pet search
 ```
 
@@ -563,13 +549,13 @@ Zip code 10001
 
 ---
 
-#### 8. greeting Intent (Optional but recommended)
+#### 8. intent.greeting Intent (Optional but recommended)
 
 1. Click **Create**
 2. Configure:
 
 ```yaml
-Display name: greeting
+Display name: intent.greeting
 Description: User greets the agent
 ```
 
@@ -592,13 +578,13 @@ Good day
 
 ---
 
-#### 9. goodbye Intent (Optional)
+#### 9. intent.goodbye Intent (Optional)
 
 1. Click **Create**
 2. Configure:
 
 ```yaml
-Display name: goodbye
+Display name: intent.goodbye
 Description: User wants to end conversation
 ```
 
@@ -765,7 +751,7 @@ We'll add routes to handle intents and navigate to flows.
 3. Configure:
 
 ```yaml
-Intent: greeting
+Intent: intent.greeting
 Condition: (leave empty)
 Fulfillment text:
   Hello! I'm PawConnect, your pet adoption assistant.
@@ -785,7 +771,7 @@ Transition: (None - stay on Start page)
 2. Configure:
 
 ```yaml
-Intent: search.pets
+Intent: intent.search_pets
 Condition: (leave empty)
 Fulfillment text: Let me help you search for pets!
 Transition: Pet Search Flow → Search Pets page
@@ -801,7 +787,7 @@ Transition: Pet Search Flow → Search Pets page
 2. Configure:
 
 ```yaml
-Intent: validate.pet.id
+Intent: intent.validate_pet_id
 Condition: (leave empty)
 Fulfillment text: Let me look up that pet for you.
 Transition: Pet Details Flow → Validate Pet ID page
@@ -817,7 +803,7 @@ Transition: Pet Details Flow → Validate Pet ID page
 2. Configure:
 
 ```yaml
-Intent: schedule.visit
+Intent: intent.schedule_visit
 Condition: (leave empty)
 Fulfillment text: I'll help you schedule a visit!
 Transition: Visit Scheduling Flow → Schedule Visit page
@@ -833,7 +819,7 @@ Transition: Visit Scheduling Flow → Schedule Visit page
 2. Configure:
 
 ```yaml
-Intent: schedule.visit.with.pet.id
+Intent: intent.schedule_visit_with_pet_id
 Condition: (leave empty)
 Fulfillment text: Let me schedule that visit for you.
 Transition: Visit Scheduling Flow → Schedule Visit with Pet ID page
@@ -849,7 +835,7 @@ Transition: Visit Scheduling Flow → Schedule Visit with Pet ID page
 2. Configure:
 
 ```yaml
-Intent: submit.application
+Intent: intent.submit_application
 Condition: (leave empty)
 Fulfillment text: Wonderful! Let me start your adoption application.
 Transition: Adoption Application Flow → Submit Application page
@@ -865,7 +851,7 @@ Transition: Adoption Application Flow → Submit Application page
 2. Configure:
 
 ```yaml
-Intent: goodbye
+Intent: intent.goodbye
 Condition: (leave empty)
 Fulfillment text:
   Thank you for using PawConnect! Good luck finding your perfect pet.
@@ -1052,21 +1038,21 @@ Use webhook response: ✅
 **Route 1: View specific pet**
 
 ```yaml
-Intent: validate.pet.id
+Intent: intent.validate_pet_id
 Transition: Pet Details Flow → Validate Pet ID page
 ```
 
 **Route 2: Schedule visit**
 
 ```yaml
-Intent: schedule.visit.with.pet.id
+Intent: intent.schedule_visit_with_pet_id
 Transition: Visit Scheduling Flow → Schedule Visit with Pet ID page
 ```
 
 **Route 3: New search**
 
 ```yaml
-Intent: search.pets
+Intent: intent.search_pets
 Transition: Pet Search Flow → Search Pets page
 ```
 
@@ -1164,7 +1150,7 @@ Use webhook response: ✅
 
 ```yaml
 Condition: $session.params.validated_pet_id != null
-Intent: schedule.visit
+Intent: intent.schedule_visit
 Fulfillment: Great! Let me schedule your visit to meet $session.params.pet_name.
 Transition: Visit Scheduling Flow → Schedule Visit page
 ```
@@ -1173,7 +1159,7 @@ Transition: Visit Scheduling Flow → Schedule Visit page
 
 ```yaml
 Condition: $session.params.validated_pet_id != null
-Intent: submit.application
+Intent: intent.submit_application
 Fulfillment: Wonderful! Let's start your application for $session.params.pet_name.
 Transition: Adoption Application Flow → Submit Application page
 ```
@@ -1226,19 +1212,19 @@ Would you like to:
 
 ```yaml
 Route 1: Schedule Visit
-  Intent: schedule.visit
+  Intent: intent.schedule_visit
   Transition: Visit Scheduling Flow → Schedule Visit page
 
 Route 2: Submit Application
-  Intent: submit.application
+  Intent: intent.submit_application
   Transition: Adoption Application Flow → Submit Application page
 
 Route 3: Search Again
-  Intent: search.pets
+  Intent: intent.search_pets
   Transition: Pet Search Flow → Search Pets page
 
 Route 4: End conversation
-  Intent: goodbye
+  Intent: intent.goodbye
   Transition: End Session
 ```
 
@@ -1309,7 +1295,7 @@ Route 1: Success
   Transition: Visit Confirmation page
 
 Route 2: Schedule another
-  Intent: schedule.visit
+  Intent: intent.schedule_visit
   Transition: Schedule Visit page (loop back)
 ```
 
@@ -1424,16 +1410,16 @@ Is there anything else I can help you with?
 
 ```yaml
 Route 1: Submit application
-  Intent: submit.application
+  Intent: intent.submit_application
   Fulfillment: Great! Let's start your adoption application.
   Transition: Adoption Application Flow → Submit Application page
 
 Route 2: Search for more pets
-  Intent: search.pets
+  Intent: intent.search_pets
   Transition: Pet Search Flow → Search Pets page
 
 Route 3: End
-  Intent: goodbye
+  Intent: intent.goodbye
   Transition: End Session
 ```
 
@@ -1601,16 +1587,16 @@ Is there anything else I can help you with today?
 
 ```yaml
 Route 1: Search more pets
-  Intent: search.pets
+  Intent: intent.search_pets
   Transition: Pet Search Flow → Search Pets page
 
 Route 2: Schedule visit
-  Intent: schedule.visit
+  Intent: intent.schedule_visit
   Fulfillment: Would you also like to schedule a visit while we process your application?
   Transition: Visit Scheduling Flow → Schedule Visit page
 
 Route 3: End
-  Intent: goodbye
+  Intent: intent.goodbye
   Transition: End Session
 ```
 

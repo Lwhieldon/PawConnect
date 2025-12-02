@@ -1,17 +1,14 @@
-# Core Dependencies
+# PawConnect AI - Consolidated Requirements
+# All dependencies needed for production and development
+
+# ============================================================================
+# CORE DEPENDENCIES (Production)
+# ============================================================================
+
+# Configuration & Settings
 python-dotenv>=1.0.0
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
-
-# Google Cloud Services
-google-cloud-aiplatform>=1.38.0
-google-cloud-dialogflow-cx>=1.20.0
-google-cloud-vision>=3.5.0
-google-cloud-pubsub>=2.18.0
-google-cloud-firestore>=2.13.0
-google-cloud-storage>=2.14.0
-google-cloud-translate>=3.13.0
-google-cloud-speech>=2.23.0
 
 # Web Framework & API
 fastapi>=0.104.0
@@ -20,49 +17,65 @@ aiohttp>=3.9.0
 httpx>=0.25.0
 requests>=2.31.0
 
-# Machine Learning & AI
-tensorflow>=2.15.0
-scikit-learn>=1.3.2
-numpy>=1.26.0
-pandas>=2.1.0
-transformers>=4.35.0
-torch>=2.1.0
+# Google Cloud Services
+google-cloud-aiplatform>=1.38.0     # Vertex AI / Gemini for conversation agent
+google-cloud-dialogflow-cx>=1.20.0  # Dialogflow CX automation & webhook
+google-cloud-vision>=3.5.0          # Vision API for pet image analysis
+google-cloud-firestore>=2.13.0      # Firestore database
+google-cloud-pubsub>=2.18.0         # Pub/Sub messaging
 
-# Data Validation & Processing
-pydantic>=2.5.0
-marshmallow>=3.20.0
+# Data Processing & Validation
+numpy>=1.26.0                       # Used in recommendation model
+email-validator>=2.1.0              # Email validation in Pydantic models
 
-# Async & Concurrency
-asyncio>=3.4.3
-aiofiles>=23.2.1
-
-# Database & Caching
-redis>=5.0.1
-sqlalchemy>=2.0.23
-psycopg2-binary>=2.9.9
+# Async & File Operations
+aiofiles>=23.2.1                    # Async file operations
 
 # Logging & Monitoring
-loguru>=0.7.2
-python-json-logger>=2.0.7
-
-# Testing
-pytest>=7.4.3
-pytest-asyncio>=0.21.1
-pytest-cov>=4.1.0
-pytest-mock>=3.12.0
-responses>=0.24.1
-faker>=20.1.0
-freezegun>=1.4.0
-
-# Development Tools
-black>=23.12.0
-flake8>=6.1.0
-mypy>=1.7.1
-pylint>=3.0.3
-pre-commit>=3.6.0
+loguru>=0.7.2                       # Structured logging
+python-json-logger>=2.0.7           # JSON log formatting
 
 # Utilities
-python-dateutil>=2.8.2
-pytz>=2023.3
-geopy>=2.4.1
-pillow>=10.1.0
+python-dateutil>=2.8.2              # Date/time utilities
+geopy>=2.4.1                        # Geocoding and distance calculations
+pillow>=10.1.0                      # Image processing
+
+# ============================================================================
+# DEVELOPMENT DEPENDENCIES (Optional)
+# Install with: pip install -e ".[dev]"
+# ============================================================================
+
+# Testing
+pytest>=7.4.3                       # Testing framework
+pytest-asyncio>=0.21.1              # Async test support
+pytest-cov>=4.1.0                   # Coverage reporting
+pytest-mock>=3.12.0                 # Mock support
+responses>=0.24.1                   # HTTP response mocking
+faker>=20.1.0                       # Fake data generation for tests
+freezegun>=1.4.0                    # Time/date mocking
+
+# Code Quality & Linting
+black>=23.12.0                      # Code formatting
+flake8>=6.1.0                       # Linting
+mypy>=1.7.1                         # Type checking
+pylint>=3.0.3                       # Code analysis
+pre-commit>=3.6.0                   # Pre-commit hooks
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# This consolidated requirements file replaces:
+# - requirements-prod.txt (removed - heavy ML libraries that were never used)
+# - requirements-webhook.txt (removed - minimal subset, but this file covers it)
+#
+# Removed unused dependencies:
+# - tensorflow, torch, transformers (heavy ML, never imported)
+# - scikit-learn, pandas (not imported anywhere)
+# - marshmallow (not used)
+# - redis (configured but not imported)
+# - sqlalchemy, psycopg2-binary (not used)
+# - google-cloud-storage (not imported)
+# - google-cloud-translate (not imported)
+# - google-cloud-speech (not imported)
+# - asyncio (built-in since Python 3.4)
+# - pytz (built-in timezone support since Python 3.9)

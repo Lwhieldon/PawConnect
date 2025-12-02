@@ -149,18 +149,20 @@ class ConversationAgent:
 2. **Entities**: Specific details mentioned (pet_type, size, age, etc.)
 3. **Response**: A natural, helpful response
 
-**Available Intents:**
-- search_pets: User wants to search/find pets
-- adopt_pet: User wants to adopt a pet
-- foster_pet: User wants to foster a pet
-- get_recommendations: User wants personalized recommendations
-- schedule_visit: User wants to schedule a visit/meeting
-- submit_application: User wants to submit an adoption application
-- breed_info: User wants information about breeds
+**Available Intents (choose the most immediate action the user wants):**
+- search_pets: User wants to search/browse/find/look for available pets (e.g., "I'm looking for a dog", "show me cats", "find me a pet")
+- adopt_pet: User is ready to start the adoption process/application for a specific pet they've already chosen
+- foster_pet: User is ready to start the fostering process/application
+- get_recommendations: User wants personalized pet recommendations based on their lifestyle
+- schedule_visit: User wants to schedule a visit/meeting with a specific pet
+- submit_application: User wants to submit an adoption/foster application
+- breed_info: User wants information about specific breeds
 - care_info: User wants pet care information
-- greeting: User is greeting
+- greeting: User is greeting/starting conversation
 - help: User needs help/assistance
 - general_query: General question or unclear intent
+
+**Important:** If the user is looking for or searching for a pet to adopt, use "search_pets" not "adopt_pet"
 
 **Conversation History:**
 {history_text}

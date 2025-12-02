@@ -394,10 +394,21 @@ pip install -r requirements.txt
 
 Create a `.env` file in the project root (see `.env.example` for full template):
 
+```bash
+# Copy example file
+cp .env.example .env
+
+# Edit with your values
+# For development: TESTING_MODE=True, MOCK_APIS=True
+# For production: TESTING_MODE=False, MOCK_APIS=False
+```
+
+**Example `.env` for development:**
+
 ```env
 # Google Cloud
 GCP_PROJECT_ID=your_project_id
-GCP_REGION=your_region
+GCP_REGION=us-central1
 
 # APIs
 RESCUEGROUPS_API_KEY=your_rescuegroups_api_key
@@ -405,20 +416,33 @@ RESCUEGROUPS_API_KEY=your_rescuegroups_api_key
 # Dialogflow
 DIALOGFLOW_AGENT_ID=your_agent_id
 
-# Vertex AI
-VERTEX_AI_ENDPOINT=your_model_endpoint
-
 # Gemini AI (for ConversationAgent)
-# Note: Using Gemini 2.0 (1.5 models retired April 2025)
 GEMINI_MODEL_NAME=gemini-2.0-flash-001
-GEMINI_TEMPERATURE=0.7
-GEMINI_MAX_OUTPUT_TOKENS=1024
 USE_GEMINI_FOR_CONVERSATION=True
 
-# Other
+# Mode
 ENVIRONMENT=development
-LOG_LEVEL=INFO
+TESTING_MODE=True
+MOCK_APIS=True
+LOG_LEVEL=DEBUG
 ```
+
+**🔐 Security Note for Production:**
+
+For production deployment, **NEVER** put real credentials in `.env` file. Instead, use Google Cloud Secret Manager:
+
+```bash
+# Setup secrets securely
+./deployment/scripts/setup-secrets.sh
+
+# Validate configuration
+./deployment/scripts/validate-secrets.sh
+
+# Load secrets for local testing
+source deployment/scripts/load-secrets.sh
+```
+
+For complete guide, see [docs/SECRETS_MANAGEMENT.md](docs/SECRETS_MANAGEMENT.md)
 
 **Note**: Gemini uses the same GCP credentials as Vertex AI. Ensure `GCP_PROJECT_ID` and `GCP_REGION` are set correctly.
 
@@ -539,6 +563,17 @@ PawConnect/
 ├── deployment/                    # Deployment configurations
 │   ├── Dockerfile                # Multi-stage Docker build
 │   ├── cloudbuild.yaml           # Google Cloud Build CI/CD
+│   ├── deploy-webhook.sh         # Webhook deployment script
+│   ├── dialogflow/               # Dialogflow CX agent configuration
+│   │   ├── agent.json            # Complete agent configuration (importable)
+│   │   ├── README.md             # Agent import & setup guide
+│   │   └── CONVERSATION_FLOW.md  # Visual conversation flow guide
+│   ├── scripts/                  # Deployment helper scripts
+│   │   ├── setup-secrets.sh      # Interactive secrets setup
+│   │   ├── load-secrets.sh       # Load secrets to environment (Linux/Mac)
+│   │   ├── load-secrets.ps1      # Load secrets to environment (Windows)
+│   │   ├── validate-secrets.sh   # Validate secrets configuration
+│   │   └── README.md             # Scripts documentation
 │   └── terraform/                # Infrastructure as Code
 │       ├── main.tf               # Main Terraform configuration
 │       ├── variables.tf          # Input variables
@@ -551,6 +586,7 @@ PawConnect/
 │   ├── DIALOGFLOW_COMPLETE_SETUP.md       # Dialogflow CX setup guide
 │   ├── GEMINI_INTEGRATION.md       # Gemini integration guide
 │   ├── WEBHOOK_SETUP.md       # Webhook setup for Dialogflow capabilities
+│   └── SECRETS_MANAGEMENT.md    # Secrets management guide
 
 
 │
@@ -757,5 +793,4 @@ Apache-2.0
 
 **Date**: November 2025
 
-**Contact**: [\[GitHub Profile\]](https://github.com/Lwhieldon)  | [\[Kaggle Profile\]](https://www.kaggle.com/leewhieldon)
-
+**Contact**: [[\Email\]](lwhieldon1@gmail.com) | [\[GitHub Profile\]](https://github.com/Lwhieldon)  | [\[Kaggle Profile\]](https://www.kaggle.com/leewhieldon)

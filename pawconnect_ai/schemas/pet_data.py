@@ -5,7 +5,7 @@ Pet data models and schemas.
 from datetime import datetime
 from enum import Enum
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, ConfigDict
 
 
 class PetType(str, Enum):
@@ -244,8 +244,8 @@ class Pet(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     last_synced: Optional[datetime] = Field(default=None)
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "pet_id": "pet_12345",
                 "name": "Max",
@@ -264,6 +264,7 @@ class Pet(BaseModel):
                 }
             }
         }
+    )
 
 
 class PetMatch(BaseModel):
@@ -299,8 +300,8 @@ class PetMatch(BaseModel):
     matched_at: datetime = Field(default_factory=datetime.utcnow)
     model_version: str = Field(default="1.0")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "pet": {"pet_id": "pet_12345", "name": "Max"},
                 "overall_score": 0.87,
@@ -312,6 +313,7 @@ class PetMatch(BaseModel):
                 "rank": 1
             }
         }
+    )
 
 
 class PetProfile(BaseModel):

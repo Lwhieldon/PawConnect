@@ -121,7 +121,8 @@ class PawConnectMainAgent:
             if not location:
                 return {
                     "response": "I need to know your location to search for pets. What city and state are you in?",
-                    "requires_input": "location"
+                    "requires_input": "location",
+                    "intent": "search_pets"
                 }
 
             # Search for pets
@@ -149,7 +150,8 @@ class PawConnectMainAgent:
             logger.error(f"Error handling search pets: {e}")
             return {
                 "response": "I had trouble searching for pets. Please try again.",
-                "error": str(e)
+                "error": str(e),
+                "intent": "search_pets"
             }
 
     async def _handle_get_recommendations(
@@ -164,7 +166,8 @@ class PawConnectMainAgent:
             if not user_profile:
                 return {
                     "response": "I need to learn more about your preferences first. What type of pet are you looking for?",
-                    "requires_input": "preferences"
+                    "requires_input": "preferences",
+                    "intent": "get_recommendations"
                 }
 
             # Get search results from session or search
@@ -186,7 +189,8 @@ class PawConnectMainAgent:
             if not pets:
                 return {
                     "response": "I couldn't find any pets matching your criteria. Would you like to adjust your search?",
-                    "recommendations": []
+                    "recommendations": [],
+                    "intent": "get_recommendations"
                 }
 
             # Generate recommendations
@@ -220,7 +224,8 @@ class PawConnectMainAgent:
             logger.error(f"Error handling recommendations: {e}")
             return {
                 "response": "I had trouble generating recommendations. Please try again.",
-                "error": str(e)
+                "error": str(e),
+                "intent": "get_recommendations"
             }
 
     async def _handle_schedule_visit(
@@ -237,7 +242,8 @@ class PawConnectMainAgent:
             if not recommendations:
                 return {
                     "response": "Which pet would you like to visit? Please tell me the pet's name or select from your recommendations.",
-                    "requires_input": "pet_selection"
+                    "requires_input": "pet_selection",
+                    "intent": "schedule_visit"
                 }
 
             # For simplicity, schedule visit for first recommended pet
@@ -271,7 +277,8 @@ class PawConnectMainAgent:
             logger.error(f"Error handling schedule visit: {e}")
             return {
                 "response": "I had trouble scheduling your visit. Please try again.",
-                "error": str(e)
+                "error": str(e),
+                "intent": "schedule_visit"
             }
 
     async def _handle_submit_application(
@@ -287,7 +294,8 @@ class PawConnectMainAgent:
             if not user_profile:
                 return {
                     "response": "I need your information to start an application. Please provide your contact details.",
-                    "requires_input": "user_info"
+                    "requires_input": "user_info",
+                    "intent": "submit_application"
                 }
 
             # Get pet from context
@@ -296,7 +304,8 @@ class PawConnectMainAgent:
             if not recommendations:
                 return {
                     "response": "Which pet would you like to apply for? Please select from your recommendations.",
-                    "requires_input": "pet_selection"
+                    "requires_input": "pet_selection",
+                    "intent": "submit_application"
                 }
 
             pet_data = recommendations[0]["pet"]
@@ -341,7 +350,8 @@ class PawConnectMainAgent:
             logger.error(f"Error handling application submission: {e}")
             return {
                 "response": "I had trouble submitting your application. Please try again.",
-                "error": str(e)
+                "error": str(e),
+                "intent": "submit_application"
             }
 
     async def create_user_profile(self, user_data: Dict[str, Any]) -> UserProfile:
@@ -556,30 +566,50 @@ Bella is a 3-year-old Golden Retriever. For more photos and information, contact
 DO NOT use complex markdown formatting. Keep responses simple with plain text and basic links only.
 IMPORTANT: The field is called photo_link (NOT photo_url) to prevent automatic image embedding.
 
-IMPORTANT - Contact Information & Appointments:
+IMPORTANT - Scheduling Appointments & Visits:
 When users ask about scheduling appointments, meeting pets, or visiting shelters:
-1. If the user has already searched for pets and you have results with shelter_contact information, provide that contact info immediately
-2. If the user asks about a specific pet by name, use the get_rescue_contact function to retrieve detailed contact information
-3. ALWAYS include: phone number, email, website, and full address
-4. Explain that appointments must be scheduled directly with the rescue organization
-5. Suggest they call or email the rescue to:
-   - Schedule a meet-and-greet appointment
-   - Ask about the pet's availability
-   - Learn about their specific adoption process
-   - Discuss any questions about the pet
-6. If contact info is not available, direct them to the adoption URL or RescueGroups.org
 
-Example response format when user asks about appointments:
-"To schedule an appointment to meet [Pet Name], please contact [Rescue Name] directly:
+1. **FIRST, ask for their preferred time** if they haven't provided it:
+   - Ask: "When would you like to visit [Pet Name]? Please let me know your preferred date and time."
+   - Example times to suggest: weekday mornings, weekday afternoons, weekend mornings, weekend afternoons
+   - Wait for user response with their preferred time
 
-📞 Phone: [phone number]
-✉️ Email: [email address]
-🌐 Website: [website]
-📍 Address: [full address]
+2. **THEN, use the schedule_visit function** with their preferred time:
+   - Pass the pet_name and the user's preferred_date and preferred_time
+   - The function will create a visit request
+   - Provide the rescue's contact information
+   - Give next steps for confirming the appointment
 
-I recommend calling or emailing them to arrange a visit. They can provide you with their visiting hours and help you schedule a time to meet [Pet Name]."
+3. **After scheduling, explain that:**
+   - The visit request has been created for their requested time
+   - The rescue will contact them to confirm or suggest alternative times
+   - They should bring valid ID and any questions about adoption
+   - They can contact the rescue directly if they need to make changes
 
-Always format contact information clearly and encourage direct communication with the rescue.
+Example interaction:
+User: "I want to schedule an appointment to meet Lucky"
+You: "I'd be happy to help you schedule a visit to meet Lucky! When would you like to visit? Please let me know your preferred date and time (for example, 'this Saturday at 10 AM' or 'next Tuesday afternoon')."
+
+User: "This Saturday at 10 AM"
+You: [Call schedule_visit with preferred_date="2025-12-07" and preferred_time="10:00 AM"]
+
+Then respond:
+"I've scheduled a visit request for you to meet Lucky!
+
+📅 Requested Time: Saturday, December 7 at 10:00 AM
+🏠 Rescue: Rescue Ranch
+📍 Address: 2216 Oberlin Rd., Yreka, Ca 96097
+📞 Phone: (530) 842-0829
+✉️ Email: Inquiries@rrdog.org
+
+Next steps:
+1. The rescue will contact you to confirm the appointment or suggest alternative times
+2. Bring a valid ID when you visit
+3. Feel free to call or email them if you need to make changes
+
+I recommend preparing any questions you have about the adoption process!"
+
+IMPORTANT: Always ask for preferred time BEFORE calling schedule_visit, unless the user already specified it in their request.
 
 Be friendly, empathetic, and guide users through the pet adoption journey with real pet listings."""
 
@@ -799,6 +829,107 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
                 "message": f"Error retrieving contact information: {str(e)}"
             })
 
+    async def schedule_visit(
+        pet_name: str,
+        location: str = "",
+        preferred_date: str = "",
+        preferred_time: str = ""
+    ) -> str:
+        """
+        Schedule a visit to meet a pet at their rescue organization.
+        This creates a visit request that will be sent to the rescue for confirmation.
+
+        Args:
+            pet_name: Name of the pet the user wants to meet
+            location: Optional location to help find the pet
+            preferred_date: Preferred date for visit (e.g., "2025-12-15" or "next week")
+            preferred_time: Preferred time for visit (e.g., "2:00 PM", "morning", "afternoon")
+
+        Returns:
+            JSON string with visit scheduling confirmation
+        """
+        import json
+        from .sub_agents.pet_search_agent import PetSearchAgent
+        from datetime import datetime, timedelta
+
+        try:
+            logger.info(f"Scheduling visit for pet: {pet_name}")
+
+            # Search for the pet to get info
+            search_agent = PetSearchAgent()
+            pets = await search_agent.search_pets(
+                location=location,
+                limit=20
+            )
+
+            # Find the pet by name (case insensitive)
+            pet = None
+            for p in pets:
+                if p.name.lower() == pet_name.lower():
+                    pet = p
+                    break
+
+            if not pet or not pet.shelter:
+                return json.dumps({
+                    "success": False,
+                    "message": f"Could not find a pet named {pet_name}. Please search for pets first.",
+                })
+
+            # Parse preferred time (simplified - just schedule for tomorrow if not specified)
+            if preferred_date:
+                # Simple date parsing - in production would use more sophisticated parsing
+                try:
+                    visit_datetime = datetime.fromisoformat(preferred_date)
+                except:
+                    # Default to tomorrow at 2 PM
+                    visit_datetime = datetime.utcnow() + timedelta(days=1)
+                    visit_datetime = visit_datetime.replace(hour=14, minute=0, second=0, microsecond=0)
+            else:
+                # Default to tomorrow at 2 PM
+                visit_datetime = datetime.utcnow() + timedelta(days=1)
+                visit_datetime = visit_datetime.replace(hour=14, minute=0, second=0, microsecond=0)
+
+            # Create tools instance and schedule visit
+            tools = PawConnectTools()
+            user_id = "web_user"  # Default user ID for web interface
+
+            visit_info = tools.schedule_visit(
+                user_id=user_id,
+                pet_id=pet.pet_id,
+                preferred_time=visit_datetime
+            )
+
+            # Build response with visit details and rescue contact info
+            return json.dumps({
+                "success": True,
+                "message": f"Visit request submitted for {pet.name}!",
+                "visit": {
+                    "visit_id": visit_info["visit_id"],
+                    "pet_name": pet.name,
+                    "pet_breed": pet.breed or "Mixed Breed",
+                    "scheduled_time": visit_info["scheduled_time"],
+                    "status": visit_info["status"],
+                    "rescue_name": pet.shelter.name,
+                    "rescue_phone": getattr(pet.shelter, 'phone', None),
+                    "rescue_email": getattr(pet.shelter, 'email', None),
+                    "rescue_website": str(pet.shelter.website) if hasattr(pet.shelter, 'website') and pet.shelter.website else None,
+                    "rescue_address": f"{getattr(pet.shelter, 'address', '')}, {pet.shelter.city}, {pet.shelter.state} {pet.shelter.zip_code}".strip(", "),
+                    "next_steps": [
+                        f"The rescue will receive your visit request for {visit_datetime.strftime('%A, %B %d at %I:%M %p')}",
+                        "They will contact you to confirm the appointment or suggest alternative times",
+                        "Please call or email them directly if you need to make changes",
+                        "Bring a valid ID and any questions you have about the adoption process"
+                    ]
+                }
+            }, indent=2)
+
+        except Exception as e:
+            logger.error(f"Error scheduling visit: {e}")
+            return json.dumps({
+                "success": False,
+                "message": f"Error scheduling visit: {str(e)}"
+            })
+
     # Create the ADK LlmAgent with Vertex AI configuration
     try:
         from google.genai import Client
@@ -840,13 +971,13 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
             name="pawconnect_ai",
             model=gemini_llm,
             instruction=SYSTEM_INSTRUCTION,
-            tools=[search_pets, get_rescue_contact]
+            tools=[search_pets, get_rescue_contact, schedule_visit]
         )
 
         logger.info(f"ADK root_agent created successfully with Vertex AI Gemini")
         logger.info(f"Project: {settings.gcp_project_id}, Region: {settings.gcp_region}")
         logger.info(f"Custom VertexAI Gemini class configured")
-        logger.info(f"Function tools registered: search_pets, get_rescue_contact")
+        logger.info(f"Function tools registered: search_pets, get_rescue_contact, schedule_visit")
 
     except Exception as e:
         logger.error(f"Failed to create ADK agent with Gemini LLM: {e}")

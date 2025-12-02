@@ -26,7 +26,8 @@ class VisionAgent:
     async def analyze_pet_image(
         self,
         image_url: str,
-        pet_type: Optional[str] = None
+        pet_type: Optional[str] = None,
+        confidence_threshold: float = 0.5
     ) -> VisionAnalysis:
         """
         Analyze a pet image to extract breed, age, and other characteristics.
@@ -34,6 +35,7 @@ class VisionAgent:
         Args:
             image_url: URL of the pet image
             pet_type: Optional pet type hint (dog, cat, etc.)
+            confidence_threshold: Minimum confidence threshold for detections (default 0.5)
 
         Returns:
             VisionAnalysis object with extracted information
@@ -46,10 +48,15 @@ class VisionAgent:
                 return self._get_mock_analysis(pet_type)
 
             # Call Google Cloud Vision API
-            vision_data = await self.google_client.analyze_image(image_url)
+            vision_data = await self._call_vision_api(image_url)
 
             # Use breed classifier to analyze results
             analysis = self.classifier.analyze_vision_results(vision_data, pet_type)
+
+            # Filter results by confidence threshold
+            if analysis.breed_confidence and analysis.breed_confidence < confidence_threshold:
+                analysis.primary_breed = None
+                analysis.detected_breeds = []
 
             logger.info(
                 f"Vision analysis complete: breed={analysis.primary_breed}, "
@@ -174,3 +181,93 @@ class VisionAgent:
             Tuple of (breed_name, confidence)
         """
         return self.classifier.classify_breed(labels, pet_type)
+
+    async def _call_vision_api(self, image_url: str) -> Dict[str, Any]:
+        """
+        Call Google Cloud Vision API to analyze an image.
+
+        Args:
+            image_url: URL of the image to analyze
+
+        Returns:
+            Vision API response data
+        """
+        try:
+            return await self.google_client.analyze_image(image_url)
+        except Exception as e:
+            logger.error(f"Vision API call failed: {e}")
+            return {}
+
+    async def _detect_breed(self, image_url: str, pet_type: str = "dog") -> Dict[str, Any]:
+        """
+        Detect breed from a pet image.
+
+        Args:
+            image_url: URL of the pet image
+            pet_type: Type of pet (dog, cat, etc.)
+
+        Returns:
+            Dict with breed detection results
+        """
+        try:
+            vision_data = await self._call_vision_api(image_url)
+
+            # Extract labels from vision data
+            labels = vision_data.get("labelAnnotations", [])
+
+            # Use breed classifier to identify breed
+            breed, confidence = self.classifier.classify_breed(labels, pet_type)
+
+            return {
+                "primary_breed": breed,
+                "breed_confidence": confidence,
+                "confidence": confidence,  # Backward compatibility
+                "all_labels": labels
+            }
+        except Exception as e:
+            logger.error(f"Breed detection failed: {e}")
+            return {"primary_breed": None, "breed_confidence": 0.0, "confidence": 0.0, "all_labels": []}
+
+    async def _estimate_age(self, image_url: str, pet_type: str = "dog") -> Dict[str, Any]:
+        """
+        Estimate age from a pet image.
+
+        Args:
+            image_url: URL of the pet image
+            pet_type: Type of pet (dog, cat, etc.)
+
+        Returns:
+            Dict with age estimation results
+        """
+        try:
+            vision_data = await self._call_vision_api(image_url)
+
+            # Extract labels from vision data
+            labels = vision_data.get("labelAnnotations", [])
+
+            # Simple age estimation based on labels
+            age = "adult"  # Default
+            confidence = 0.6
+
+            # Check for age-related labels
+            label_texts = [label.get("description", "").lower() for label in labels]
+
+            if any(word in label_texts for word in ["puppy", "kitten", "baby"]):
+                age = "baby"
+                confidence = 0.8
+            elif any(word in label_texts for word in ["young", "juvenile"]):
+                age = "young"
+                confidence = 0.75
+            elif any(word in label_texts for word in ["senior", "old", "elderly"]):
+                age = "senior"
+                confidence = 0.7
+
+            return {
+                "estimated_age": age,
+                "age_confidence": confidence,
+                "confidence": confidence,  # Backward compatibility
+                "all_labels": labels
+            }
+        except Exception as e:
+            logger.error(f"Age estimation failed: {e}")
+            return {"estimated_age": "unknown", "age_confidence": 0.0, "confidence": 0.0, "all_labels": []}

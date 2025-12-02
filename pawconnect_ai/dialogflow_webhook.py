@@ -18,11 +18,13 @@ logger.add(sys.stderr, level="INFO")
 logger.info("Starting PawConnect Dialogflow Webhook...")
 
 try:
+    # Import API clients - may initialize with default/missing config
     from .utils.api_clients import rescuegroups_client
     logger.info("Successfully imported API clients")
 except Exception as e:
     logger.error(f"Failed to import API clients: {e}")
-    raise
+    logger.warning("Continuing startup - API clients may not be fully initialized")
+    rescuegroups_client = None
 
 
 # Initialize FastAPI app
@@ -59,6 +61,20 @@ async def startup_event():
     logger.info("Webhook service is starting up...")
     logger.info("Health check endpoint available at /health")
     logger.info("Webhook endpoint available at /webhook")
+
+    # Log configuration status (without exposing sensitive values)
+    from .config import settings
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"Testing mode: {settings.testing_mode}")
+    logger.info(f"Mock APIs: {settings.mock_apis}")
+    logger.info(f"GCP Project: {settings.gcp_project_id}")
+    logger.info(f"RescueGroups API configured: {'Yes' if settings.rescuegroups_api_key else 'No (using defaults)'}")
+    logger.info(f"Dialogflow Agent ID configured: {'Yes' if settings.dialogflow_agent_id else 'No (using defaults)'}")
+
+    if rescuegroups_client is None:
+        logger.warning("RescueGroups client not initialized - API calls will fail")
+
+    logger.info("Startup complete - ready to accept requests")
 
 
 @app.get("/")
@@ -146,6 +162,13 @@ async def handle_validate_pet_id(
         if not pet_id:
             return create_text_response(
                 "I need a pet ID to look up. Could you provide the pet's ID number?"
+            )
+
+        # Check if API client is available
+        if rescuegroups_client is None:
+            logger.error("RescueGroups client not initialized")
+            return create_text_response(
+                "I'm sorry, the pet lookup service is currently unavailable. Please try again later."
             )
 
         # Fetch pet details from RescueGroups API

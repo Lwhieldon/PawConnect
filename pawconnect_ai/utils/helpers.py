@@ -253,12 +253,14 @@ def format_match_explanation(
     return explanation, key_factors, concerns
 
 
-def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def parse_rescuegroups_response(data: Dict[str, Any], pet_type: Optional[str] = None, limit: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Parse RescueGroups API response into standardized format.
 
     Args:
         data: Raw RescueGroups API response
+        pet_type: Type of pet being searched (dog, cat, etc.) to correctly set species
+        limit: Maximum number of results to return
 
     Returns:
         List of normalized pet data dictionaries
@@ -313,11 +315,24 @@ def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 elif isinstance(species_relationship, dict):
                     species_id = species_relationship.get("id")
 
-            # Infer species from breed or default to dog
+            # Determine species - prefer the pet_type parameter, then species_id mapping, then infer from breed
             species = "dog"  # Default
-            breed_string = animal.get("breedString", "")
-            if "cat" in breed_string.lower():
-                species = "cat"
+            if pet_type:
+                # Use the explicitly provided pet_type
+                species = pet_type.lower()
+            elif species_id:
+                # Map common species IDs (1=dog, 2=cat, 3=rabbit, 4=small animal, 8=bird)
+                species_map = {"1": "dog", "2": "cat", "3": "rabbit", "4": "small_animal", "8": "bird"}
+                species = species_map.get(str(species_id), "dog")
+            else:
+                # Fall back to inferring from breed string
+                breed_string = animal.get("breedString", "")
+                if "cat" in breed_string.lower():
+                    species = "cat"
+                elif "rabbit" in breed_string.lower() or "bunny" in breed_string.lower():
+                    species = "rabbit"
+                elif "bird" in breed_string.lower():
+                    species = "bird"
 
             # Extract photo URL
             photos = []
@@ -332,6 +347,11 @@ def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 })
 
             # Extract shelter information
+            website = org_data.get("url") or org_data.get("website")
+            # Fix website URLs that don't have a protocol
+            if website and not website.startswith(("http://", "https://")):
+                website = f"https://{website}"
+
             shelter = {
                 "organization_id": org_id or "unknown",
                 "name": org_data.get("name", "Unknown Shelter"),
@@ -341,7 +361,7 @@ def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "city": org_data.get("city", "Unknown"),
                 "state": org_data.get("state", "XX"),
                 "zip_code": org_data.get("postalcode", "00000"),
-                "website": org_data.get("url") or org_data.get("website"),  # Capture website URL
+                "website": website,  # Capture website URL with protocol
             }
 
             # Extract attributes from v5 API fields
@@ -429,9 +449,17 @@ def parse_rescuegroups_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
 
             pets.append(pet_data)
 
+            # Stop if we've reached the limit
+            if limit and len(pets) >= limit:
+                break
+
         except Exception as e:
             logger.warning(f"Error parsing pet data: {e}")
             continue
+
+    # Ensure we don't exceed the limit
+    if limit:
+        pets = pets[:limit]
 
     return pets
 
