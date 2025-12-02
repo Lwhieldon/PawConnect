@@ -472,8 +472,42 @@ class DialogflowSetup:
                 logger.info(f"  Could not access START_PAGE directly: {e}")
                 start_page = None
 
-        # Note: Event handler cleanup is done at page level (see Get Recommendations page update)
-        # Flow-level sys.no-match-default event handlers cannot be deleted as they are system-managed
+        # CRITICAL FIX: Update the problematic sys.no-match-default event handler at flow level
+        # Instead of deleting (which API won't allow), we'll update it with a better message
+        try:
+            flow = self.flows_client.get_flow(name=flow_name)
+
+            # Find and update sys.no-match-default handlers that have the welcome message
+            updated = False
+            for eh in flow.event_handlers:
+                if eh.event == "sys.no-match-default":
+                    # Check if this handler has the welcome message
+                    has_welcome = any(
+                        "Welcome to PawConnect" in text
+                        for msg in eh.trigger_fulfillment.messages
+                        for text in (msg.text.text if hasattr(msg, 'text') else [])
+                    )
+
+                    if has_welcome:
+                        # Update with a more appropriate message for no-match scenarios
+                        eh.trigger_fulfillment.messages[:] = [
+                            ResponseMessage(
+                                text=ResponseMessage.Text(
+                                    text=["I didn't quite catch that. Could you rephrase or try again?"]
+                                )
+                            )
+                        ]
+                        updated = True
+                        logger.info("  ✓ Updated sys.no-match-default event handler with appropriate message")
+
+            if updated:
+                # Update the flow
+                update_mask = {"paths": ["event_handlers"]}
+                self.flows_client.update_flow(flow=flow, update_mask=update_mask)
+            else:
+                logger.info("  No problematic event handlers found to update")
+        except Exception as e:
+            logger.warning(f"  Could not update flow event handlers: {e}")
 
         # Configure START_PAGE if we found it
         if not start_page:
@@ -539,15 +573,46 @@ class DialogflowSetup:
                                 tag="search-pets"
                             ) if webhook_name else Fulfillment(
                                 messages=[ResponseMessage(text=ResponseMessage.Text(text=["Searching for pets..."]))]
-                            ),
-                            target_flow=flow_name
+                            )
+                            # No target specified - let webhook response control the flow
                         )
                     ]
                 )
             )
             logger.info("  ✓ Pet Search page created")
         else:
-            logger.info("  ✓ Pet Search page exists")
+            # Update existing page to ensure webhook route is configured
+            logger.info("  Updating Pet Search page with webhook route...")
+            pet_search_page = pages_by_name["Pet Search"]
+
+            # Clear entry_fulfillment to prevent double webhook calls
+            # The webhook should ONLY be called when form is complete, not when entering the page
+            pet_search_page.entry_fulfillment = Fulfillment()
+
+            # Clear all page-level event handlers to prevent interference
+            event_handler_count = len(pet_search_page.event_handlers)
+            pet_search_page.event_handlers.clear()
+            if event_handler_count > 0:
+                logger.info(f"  Cleared {event_handler_count} page-level event handler(s) from Pet Search")
+
+            # Update transition routes to ensure webhook is called when form is complete
+            pet_search_page.transition_routes.clear()
+            pet_search_page.transition_routes.append(
+                TransitionRoute(
+                    condition="$page.params.status = \"FINAL\"",
+                    trigger_fulfillment=Fulfillment(
+                        webhook=webhook_name,
+                        tag="search-pets"
+                    ) if webhook_name else Fulfillment(
+                        messages=[ResponseMessage(text=ResponseMessage.Text(text=["Searching for pets..."]))]
+                    )
+                    # No target specified - let webhook response control the flow
+                )
+            )
+
+            # Update the page
+            self.pages_client.update_page(page=pet_search_page)
+            logger.info("  ✓ Pet Search page updated (cleared entry fulfillment, set webhook route)")
 
         # Get Recommendations page
         # Get housing_type entity
@@ -595,38 +660,73 @@ class DialogflowSetup:
                                 tag="get-recommendations"
                             ) if webhook_name else Fulfillment(
                                 messages=[ResponseMessage(text=ResponseMessage.Text(text=["Getting recommendations..."]))]
-                            ),
-                            target_flow=flow_name
+                            )
+                            # No target specified - let webhook response control the flow
                         )
                     ]
                 )
             )
             logger.info("  ✓ Get Recommendations page created")
         else:
-            # Update existing page to ensure correct entity type
+            # Update existing page to ensure correct entity type and transition routes
             logger.info("  Updating Get Recommendations page with correct entity type...")
             get_rec_page = pages_by_name["Get Recommendations"]
 
-            # Update the form parameters with correct entity type
-            get_rec_page.form.parameters[0].entity_type = housing_entity_path
-            get_rec_page.form.parameters[0].display_name = "housing"
-            get_rec_page.form.parameters[0].required = True
-
-            # CRITICAL FIX: Remove any sys.no-match-default event handlers with welcome message
-            # This is the page-level event handler that was causing "apartment" to trigger welcome message
-            original_count = len(get_rec_page.event_handlers)
-            get_rec_page.event_handlers[:] = [
-                eh for eh in get_rec_page.event_handlers
-                if not (eh.event == "sys.no-match-default" and
-                       any("Welcome to PawConnect" in str(msg) for msg in eh.trigger_fulfillment.messages))
+            # Update the form parameters with correct entity types and prompts
+            # Configure housing parameter
+            housing_param = get_rec_page.form.parameters[0]
+            housing_param.entity_type = housing_entity_path
+            housing_param.display_name = "housing"
+            housing_param.required = True
+            # Update the fill_behavior prompt
+            housing_param.fill_behavior.initial_prompt_fulfillment.messages[:] = [
+                ResponseMessage(text=ResponseMessage.Text(
+                    text=["What type of housing do you have? (apartment, house, condo, etc.)"]
+                ))
             ]
-            removed_count = original_count - len(get_rec_page.event_handlers)
-            if removed_count > 0:
-                logger.info(f"  Removed {removed_count} problematic event handler(s) from Get Recommendations page")
+
+            # Configure experience parameter if it exists
+            if len(get_rec_page.form.parameters) >= 2:
+                experience_param = get_rec_page.form.parameters[1]
+                experience_param.entity_type = "projects/-/locations/-/agents/-/entityTypes/sys.any"
+                experience_param.display_name = "experience"
+                experience_param.required = True
+                # Update the fill_behavior prompt
+                experience_param.fill_behavior.initial_prompt_fulfillment.messages[:] = [
+                    ResponseMessage(text=ResponseMessage.Text(
+                        text=["Do you have experience with pets?"]
+                    ))
+                ]
+
+            # Clear entry_fulfillment to prevent double webhook calls
+            # The webhook should ONLY be called when form is complete, not when entering the page
+            get_rec_page.entry_fulfillment = Fulfillment()
+
+            # CRITICAL: Clear all page-level event handlers
+            # These can interfere with transition routes and cause loops
+            event_handler_count = len(get_rec_page.event_handlers)
+            get_rec_page.event_handlers.clear()
+            if event_handler_count > 0:
+                logger.info(f"  Cleared {event_handler_count} page-level event handler(s)")
+
+            # Update transition routes to ensure webhook is called when form is complete
+            get_rec_page.transition_routes.clear()
+            get_rec_page.transition_routes.append(
+                TransitionRoute(
+                    condition="$page.params.status = \"FINAL\"",
+                    trigger_fulfillment=Fulfillment(
+                        webhook=webhook_name,
+                        tag="get-recommendations"
+                    ) if webhook_name else Fulfillment(
+                        messages=[ResponseMessage(text=ResponseMessage.Text(text=["Getting recommendations..."]))]
+                    )
+                    # No target specified - let webhook response control the flow
+                )
+            )
 
             # Update the page
             self.pages_client.update_page(page=get_rec_page)
-            logger.info("  ✓ Get Recommendations page updated")
+            logger.info("  ✓ Get Recommendations page updated (cleared entry fulfillment, set webhook route)")
 
         # Add transition routes to START_PAGE
         if start_page:
