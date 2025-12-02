@@ -472,20 +472,8 @@ class DialogflowSetup:
                 logger.info(f"  Could not access START_PAGE directly: {e}")
                 start_page = None
 
-        # Clean up any existing sys.no-match-default event handlers with welcome message
-        # This fixes the issue where "apartment" triggers the welcome message
-        try:
-            flow = self.flows_client.get_flow(name=flow_name)
-            # Remove any event handlers that might have the welcome message
-            flow.event_handlers[:] = [
-                eh for eh in flow.event_handlers
-                if not (eh.event == "sys.no-match-default" and
-                       any("Welcome to PawConnect" in str(msg) for msg in eh.trigger_fulfillment.messages))
-            ]
-            self.flows_client.update_flow(flow=flow)
-            logger.info("  ✓ Cleaned up flow event handlers")
-        except Exception as e:
-            logger.warning(f"  Could not clean up event handlers: {e}")
+        # Note: Event handler cleanup is done at page level (see Get Recommendations page update)
+        # Flow-level sys.no-match-default event handlers cannot be deleted as they are system-managed
 
         # Configure START_PAGE if we found it
         if not start_page:
