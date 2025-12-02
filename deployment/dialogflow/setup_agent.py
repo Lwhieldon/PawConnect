@@ -449,11 +449,52 @@ class DialogflowSetup:
         pages_list = list(self.pages_client.list_pages(parent=flow_name))
         pages_by_name = {p.display_name: p for p in pages_list}
 
-        # Find START_PAGE (it's a special page that always exists)
-        start_page = next((p for p in pages_list if p.display_name == "START_PAGE"), None)
+        # Debug: Log all page names
+        logger.info(f"  Found {len(pages_list)} pages: {[p.display_name for p in pages_list]}")
 
-        if start_page:
+        # Find START_PAGE - try different possible names
+        start_page = None
+        for page in pages_list:
+            if page.display_name in ["START_PAGE", "Start Page", "start_page"]:
+                start_page = page
+                logger.info(f"  Found START_PAGE: {page.name}")
+                break
+
+        # If not found in list, try to access START_PAGE directly with special ID
+        if not start_page:
+            try:
+                # START_PAGE has a special UUID of all zeros
+                start_page_path = f"{flow_name}/pages/00000000-0000-0000-0000-000000000000"
+                logger.info(f"  Attempting to access START_PAGE directly: {start_page_path}")
+                start_page = self.pages_client.get_page(name=start_page_path)
+                logger.info("  ✓ Successfully accessed START_PAGE directly!")
+            except Exception as e:
+                logger.info(f"  Could not access START_PAGE directly: {e}")
+                start_page = None
+
+        # Clean up any existing sys.no-match-default event handlers with welcome message
+        # This fixes the issue where "apartment" triggers the welcome message
+        try:
+            flow = self.flows_client.get_flow(name=flow_name)
+            # Remove any event handlers that might have the welcome message
+            flow.event_handlers[:] = [
+                eh for eh in flow.event_handlers
+                if not (eh.event == "sys.no-match-default" and
+                       any("Welcome to PawConnect" in str(msg) for msg in eh.trigger_fulfillment.messages))
+            ]
+            self.flows_client.update_flow(flow=flow)
+            logger.info("  ✓ Cleaned up flow event handlers")
+        except Exception as e:
+            logger.warning(f"  Could not clean up event handlers: {e}")
+
+        # Configure START_PAGE if we found it
+        if not start_page:
+            logger.info("  START_PAGE not accessible, will configure routes at flow level...")
+            # We'll skip the welcome message configuration and just set up routes at flow level
+            # The welcome message can be configured manually in the Dialogflow Console if needed
+        else:
             # Update START_PAGE with welcome message
+            logger.info("  Configuring welcome message on START_PAGE...")
             welcome_message = (
                 "Welcome to PawConnect! I'm here to help you find your perfect pet companion. "
                 "I can help you search for pets, learn about specific animals, schedule visits, "
@@ -470,8 +511,6 @@ class DialogflowSetup:
 
             self.pages_client.update_page(page=start_page)
             logger.info("  ✓ Welcome message configured")
-        else:
-            logger.warning("  START_PAGE not found, skipping welcome message")
 
         # Pet Search page
         if "Pet Search" not in pages_by_name:
@@ -523,12 +562,14 @@ class DialogflowSetup:
             logger.info("  ✓ Pet Search page exists")
 
         # Get Recommendations page
+        # Get housing_type entity
+        housing_entity = self._entity_types_cache.get("housing_type")
+        housing_entity_path = housing_entity.name if housing_entity else "projects/-/locations/-/agents/-/entityTypes/sys.any"
+
+        logger.info(f"  Using housing_type entity: {housing_entity_path}")
+
         if "Get Recommendations" not in pages_by_name:
             logger.info("  Creating Get Recommendations page...")
-
-            # Get housing_type entity
-            housing_entity = self._entity_types_cache.get("housing_type")
-            housing_entity_path = housing_entity.name if housing_entity else "projects/-/locations/-/agents/-/entityTypes/sys.any"
 
             get_rec_page = self.pages_client.create_page(
                 parent=flow_name,
@@ -574,7 +615,30 @@ class DialogflowSetup:
             )
             logger.info("  ✓ Get Recommendations page created")
         else:
-            logger.info("  ✓ Get Recommendations page exists")
+            # Update existing page to ensure correct entity type
+            logger.info("  Updating Get Recommendations page with correct entity type...")
+            get_rec_page = pages_by_name["Get Recommendations"]
+
+            # Update the form parameters with correct entity type
+            get_rec_page.form.parameters[0].entity_type = housing_entity_path
+            get_rec_page.form.parameters[0].display_name = "housing"
+            get_rec_page.form.parameters[0].required = True
+
+            # CRITICAL FIX: Remove any sys.no-match-default event handlers with welcome message
+            # This is the page-level event handler that was causing "apartment" to trigger welcome message
+            original_count = len(get_rec_page.event_handlers)
+            get_rec_page.event_handlers[:] = [
+                eh for eh in get_rec_page.event_handlers
+                if not (eh.event == "sys.no-match-default" and
+                       any("Welcome to PawConnect" in str(msg) for msg in eh.trigger_fulfillment.messages))
+            ]
+            removed_count = original_count - len(get_rec_page.event_handlers)
+            if removed_count > 0:
+                logger.info(f"  Removed {removed_count} problematic event handler(s) from Get Recommendations page")
+
+            # Update the page
+            self.pages_client.update_page(page=get_rec_page)
+            logger.info("  ✓ Get Recommendations page updated")
 
         # Add transition routes to START_PAGE
         if start_page:
@@ -612,6 +676,55 @@ class DialogflowSetup:
 
                 self.pages_client.update_page(page=start_page)
                 logger.info("  ✓ Transition routes configured")
+        else:
+            # If START_PAGE not found, add routes to flow level
+            logger.info("  Configuring transition routes at flow level...")
+
+            # Refresh pages list to get newly created pages
+            pages_list = list(self.pages_client.list_pages(parent=flow_name))
+            pet_search_page = next((p for p in pages_list if p.display_name == "Pet Search"), None)
+            get_rec_page = next((p for p in pages_list if p.display_name == "Get Recommendations"), None)
+
+            if pet_search_page and get_rec_page:
+                # Get the flow and add transition routes
+                flow = self.flows_client.get_flow(name=flow_name)
+
+                # Keep existing routes but filter out our intents first to avoid duplicates
+                existing_routes = [
+                    route for route in flow.transition_routes
+                    if route.intent not in [intent_search_pets.name, intent_get_recommendations.name]
+                ]
+
+                # Add our routes
+                new_routes = [
+                    TransitionRoute(
+                        intent=intent_search_pets.name,
+                        target_page=pet_search_page.name,
+                        trigger_fulfillment=Fulfillment(
+                            set_parameter_actions=[
+                                Fulfillment.SetParameterAction(
+                                    parameter="location",
+                                    value="$session.params.location"
+                                ),
+                                Fulfillment.SetParameterAction(
+                                    parameter="species",
+                                    value="$session.params.species"
+                                )
+                            ]
+                        )
+                    ),
+                    TransitionRoute(
+                        intent=intent_get_recommendations.name,
+                        target_page=get_rec_page.name
+                    )
+                ]
+
+                # Update flow with combined routes
+                flow.transition_routes.clear()
+                flow.transition_routes.extend(existing_routes + new_routes)
+
+                self.flows_client.update_flow(flow=flow)
+                logger.info("  ✓ Transition routes configured at flow level")
 
         logger.info("✓ Flows and pages configured")
 
@@ -739,7 +852,20 @@ def main():
         logger.info("║  ✓ Setup Complete!                     ║")
         logger.info("╚════════════════════════════════════════╝")
         logger.info("")
-        logger.info("Your agent is ready! Test in Dialogflow CX Simulator:")
+        logger.info("✅ What was configured:")
+        logger.info("  • Entity types (housing, species, size, age)")
+        logger.info("  • Intents with parameter annotations")
+        logger.info("  • Pages (Pet Search, Get Recommendations)")
+        logger.info("  • Transition routes at flow level")
+        logger.info("  • Webhook configuration")
+        logger.info("")
+        logger.info("📝 Manual step (optional):")
+        logger.info("  To add a welcome message, go to Dialogflow Console:")
+        logger.info("  Build > Default Start Flow > Entry fulfillment")
+        logger.info("  Add: 'Welcome to PawConnect! I'm here to help you")
+        logger.info("        find your perfect pet companion.'")
+        logger.info("")
+        logger.info("🧪 Test in Dialogflow CX Simulator:")
         logger.info("  1. 'I want to adopt a dog in Seattle'")
         logger.info("  2. 'Yes please show me recommendations'")
         logger.info("  3. 'apartment' (when asked about housing)")
