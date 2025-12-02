@@ -213,7 +213,7 @@ class DialogflowAutomation:
 
     def update_start_page(self, flow_name: str) -> bool:
         """
-        Update the Default Start Flow with welcome message via event handler.
+        Update the START_PAGE with welcome message in entry fulfillment.
 
         Args:
             flow_name: Flow resource name
@@ -222,49 +222,42 @@ class DialogflowAutomation:
             True if successful, False otherwise
         """
         try:
-            # Get the flow to update its event handlers
-            flow = self.flows_client.get_flow(name=flow_name)
-
-            # Update welcome message to match documentation
+            # Welcome message to match documentation
             welcome_message = (
                 "Welcome to PawConnect! I'm here to help you find your perfect pet companion. "
                 "I can help you search for pets, learn about specific animals, schedule visits, "
                 "or start an adoption application. What would you like to do?"
             )
 
-            # Check if there's already a welcome event handler
-            has_welcome = False
-            for i, event_handler in enumerate(flow.event_handlers):
-                if event_handler.event == "sys.no-match-default" or event_handler.event == "sys.no-input-default":
-                    # Update existing handler
-                    flow.event_handlers[i].trigger_fulfillment = Fulfillment(
-                        messages=[
-                            ResponseMessage(
-                                text=ResponseMessage.Text(text=[welcome_message])
-                            )
-                        ]
-                    )
-                    has_welcome = True
-                    break
+            # Get the START_PAGE
+            start_page_name = f"{flow_name}/pages/START_PAGE"
 
-            # If no event handler exists, we'll just log info
-            # The welcome message should be set manually or via the START page directly
-            if not has_welcome:
-                logger.info("ℹ No event handlers found for welcome message")
+            try:
+                start_page = self.pages_client.get_page(name=start_page_name)
+
+                # Update entry fulfillment with welcome message
+                start_page.entry_fulfillment = Fulfillment(
+                    messages=[
+                        ResponseMessage(
+                            text=ResponseMessage.Text(text=[welcome_message])
+                        )
+                    ]
+                )
+
+                # Update the page
+                updated_page = self.pages_client.update_page(page=start_page)
+                logger.info("✓ Updated START_PAGE with welcome message")
+                return True
+
+            except Exception as e:
+                logger.warning(f"⚠ Could not update START_PAGE directly: {e}")
                 logger.info("  The welcome message should be configured in the Dialogflow Console")
                 logger.info("  by editing the Default Start Flow's START page entry fulfillment")
+                logger.info(f"  Message: '{welcome_message}'")
                 return True  # Non-blocking
 
-            # Update the flow
-            updated_flow = self.flows_client.update_flow(flow=flow)
-            logger.info(f"✓ Updated flow event handlers with welcome message")
-            return True
-
         except Exception as e:
-            logger.error(f"✗ Error updating flow: {e}")
-            logger.info("ℹ Configure the welcome message in the Dialogflow Console:")
-            logger.info("  Navigate to: Default Start Flow → START page → Entry fulfillment")
-            logger.info(f"  Message: '{welcome_message}'")
+            logger.error(f"✗ Error updating START_PAGE: {e}")
             return True  # Non-blocking - don't fail the entire setup
 
     def create_page(

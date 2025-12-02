@@ -648,17 +648,25 @@ In practice, PawConnect AI has the potential to:
 
 With additional development time, the system could incorporate:
 
-1. **Predictive Health Analytics**: Partner with veterinary AI platforms to predict future health costs and care needs based on breed, age, and medical history, helping users make informed financial decisions.
+1. **Visit Scheduling & Rescue Notifications**: Enhance the current placeholder `schedule_visit` implementation with:
+   - **Email Notification Service**: Integrate SendGrid, Mailgun, or SMTP to automatically notify rescues when users request visits
+   - **Database Persistence**: Save visit requests to Firestore with status tracking (pending → confirmed → completed)
+   - **Rescue Portal/Dashboard**: Web interface where rescue organizations can view, manage, and confirm visit requests
+   - **Calendar Integration**: Sync with shelter Google Calendars to show available time slots and prevent double-booking
+   - **Bidirectional Notifications**: Email/SMS users when rescues confirm appointments, with reminders before visits
+   - **Rescheduling Workflow**: Allow both users and rescues to propose alternative times through the system
 
-2. **AR Virtual Meet-and-Greets**: Use ARCore to let users visualize pets in their home environment before visits, improving confidence in size/space compatibility.
+2. **Predictive Health Analytics**: Partner with veterinary AI platforms to predict future health costs and care needs based on breed, age, and medical history, helping users make informed financial decisions.
 
-3. **Post-Adoption Support Agent**: Ongoing guidance for new pet parents, answering training questions, scheduling vet reminders, and detecting early signs of behavioral issues through conversation.
+3. **AR Virtual Meet-and-Greets**: Use ARCore to let users visualize pets in their home environment before visits, improving confidence in size/space compatibility.
 
-4. **Shelter Operations Dashboard**: Analytics for shelters showing which pet profiles generate most interest, optimal photo angles (via Vision Agent analysis), and predicted time-to-adoption.
+4. **Post-Adoption Support Agent**: Ongoing guidance for new pet parents, answering training questions, scheduling vet reminders, and detecting early signs of behavioral issues through conversation.
 
-5. **Multi-Pet Household Matching**: Extend Vision Agent to analyze multiple pets together, assessing pack dynamics and recommending compatible additions.
+5. **Shelter Operations Dashboard**: Analytics for shelters showing which pet profiles generate most interest, optimal photo angles (via Vision Agent analysis), and predicted time-to-adoption.
 
-6. **Community Integration via MCP**: Integrate Model Context Protocol servers to connect with foster/adopter forums, veterinary knowledge bases, and training resources, providing comprehensive ecosystem support.
+6. **Multi-Pet Household Matching**: Extend Vision Agent to analyze multiple pets together, assessing pack dynamics and recommending compatible additions.
+
+7. **Community Integration via MCP**: Integrate Model Context Protocol servers to connect with foster/adopter forums, veterinary knowledge bases, and training resources, providing comprehensive ecosystem support.
 
 ## Key Technologies
 

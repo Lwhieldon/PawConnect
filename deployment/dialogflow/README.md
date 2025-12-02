@@ -164,9 +164,12 @@ Go to **Manage** > **Entity Types** > **Create** and add each of these:
 #### 4. housing_type
 - **Kind**: Map
 - **Entities**:
-  - `own` → synonyms: own, owner, homeowner, I own
-  - `rent` → synonyms: rent, renter, renting, I rent, lease
-  - `live_with_family` → synonyms: live with family, parents, family home
+  - `apartment` → synonyms: apartment, apt, flat, apartments, apartment building
+  - `house` → synonyms: house, home, single family, single-family home
+  - `condo` → synonyms: condo, condominium, townhouse, townhome
+  - `own` → synonyms: own, owner, homeowner, I own, own my home
+  - `rent` → synonyms: rent, renter, renting, I rent, lease, renting a place
+  - `live_with_family` → synonyms: live with family, parents, family home, with parents, parents house
 
 ### Step 3: Create Intents
 

@@ -60,9 +60,47 @@ def main():
     logger.info(f"Webhook URL: {args.webhook_url or 'Not provided'}")
     logger.info("")
 
-    # Step 1: Update intent with parameter annotations
+    # Step 1: Update entity types
     logger.info("========================================")
-    logger.info("Step 1: Updating Intent Parameters")
+    logger.info("Step 1: Updating Entity Types")
+    logger.info("========================================")
+    logger.info("")
+
+    try:
+        cmd = [
+            sys.executable,
+            "deployment/dialogflow/update_entity_types.py",
+            "--project-id", args.project_id,
+            "--agent-id", args.agent_id,
+            "--location", args.location
+        ]
+
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        logger.info(result.stdout)
+
+        if result.returncode != 0:
+            logger.error("✗ Failed to update entity types")
+            if result.stderr:
+                logger.error(result.stderr)
+            return False
+
+        logger.info("✓ Entity types updated successfully")
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"✗ Failed to update entity types: {e}")
+        if e.stdout:
+            logger.error(e.stdout)
+        if e.stderr:
+            logger.error(e.stderr)
+        return False
+    except Exception as e:
+        logger.error(f"✗ Error: {e}")
+        return False
+
+    # Step 2: Update intent with parameter annotations
+    logger.info("")
+    logger.info("========================================")
+    logger.info("Step 2: Updating Intent Parameters")
     logger.info("========================================")
     logger.info("")
 
@@ -97,10 +135,10 @@ def main():
         logger.error(f"✗ Error: {e}")
         return False
 
-    # Step 2: Update pages and flows with parameter presets
+    # Step 3: Update pages and flows with parameter presets
     logger.info("")
     logger.info("========================================")
-    logger.info("Step 2: Updating Pages and Flows")
+    logger.info("Step 3: Updating Pages and Flows")
     logger.info("========================================")
     logger.info("")
 
@@ -146,14 +184,20 @@ def main():
     logger.info("╚════════════════════════════════════════╝")
     logger.info("")
     logger.info("✅ What was fixed:")
-    logger.info("  • Intent training phrases now include parameter annotations")
+    logger.info("  • housing_type entity: Added apartment, house, condo")
+    logger.info("  • intent.search_pets: Parameter-annotated training phrases")
+    logger.info("  • intent.get_recommendations: Affirmative response training phrases")
     logger.info("  • Transition routes now have parameter presets")
     logger.info("  • Location and species are extracted from initial utterance")
+    logger.info("  • Flow restart logic prevents conversation loops")
     logger.info("")
     logger.info("📝 Test in Dialogflow Simulator:")
-    logger.info("  Try: 'I want to adopt a dog in Seattle'")
-    logger.info("  Expected: Agent extracts 'dog' and 'Seattle' automatically")
-    logger.info("           No need to ask for location again!")
+    logger.info("  1. 'I want to adopt a dog in Seattle'")
+    logger.info("     → Agent extracts 'dog' and 'Seattle' automatically")
+    logger.info("  2. 'Yes please show me recommendations'")
+    logger.info("     → Agent recognizes affirmative response")
+    logger.info("  3. When asked about housing, say 'apartment'")
+    logger.info("     → Agent recognizes 'apartment' as valid housing type")
     logger.info("")
 
     return True

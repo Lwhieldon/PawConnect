@@ -203,9 +203,12 @@ create_entity_type "pet_age_group" \
     "senior|senior,elderly,old,older"
 
 create_entity_type "housing_type" \
-    "own|own,owner,homeowner" \
-    "rent|rent,renter,renting,lease" \
-    "live_with_family|live with family,parents,family home"
+    "apartment|apartment,apt,flat,apartments,apartment building" \
+    "house|house,home,single family,single-family home" \
+    "condo|condo,condominium,townhouse,townhome" \
+    "own|own,owner,homeowner,I own,own my home" \
+    "rent|rent,renter,renting,lease,I rent,renting a place" \
+    "live_with_family|live with family,parents,family home,with parents,parents house"
 
 echo ""
 echo -e "${BLUE}========================================${NC}"

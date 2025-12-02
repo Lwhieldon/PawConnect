@@ -14,6 +14,131 @@ from google.api_core.client_options import ClientOptions
 from loguru import logger
 
 
+def update_get_recommendations_intent(
+    project_id: str,
+    agent_id: str,
+    location: str = "us-central1"
+) -> bool:
+    """
+    Update the intent.get_recommendations intent with more training phrases.
+
+    Args:
+        project_id: GCP project ID
+        agent_id: Dialogflow CX agent ID
+        location: Agent location
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Build agent path
+        agent_path = f"projects/{project_id}/locations/{location}/agents/{agent_id}"
+
+        # Build regional API endpoint
+        api_endpoint = f"{location}-dialogflow.googleapis.com"
+        client_options = ClientOptions(api_endpoint=api_endpoint)
+
+        # Initialize client
+        intents_client = IntentsClient(client_options=client_options)
+
+        logger.info(f"Looking up intent.get_recommendations in agent: {agent_path}")
+
+        # Find the intent
+        intents_list = list(intents_client.list_intents(parent=agent_path))
+        recommendations_intent = None
+
+        for intent in intents_list:
+            if intent.display_name == "intent.get_recommendations":
+                recommendations_intent = intent
+                logger.info(f"✓ Found intent: {intent.name}")
+                break
+
+        if not recommendations_intent:
+            logger.error("✗ Intent 'intent.get_recommendations' not found")
+            return False
+
+        # Define training phrases - include affirmative responses
+        training_phrases = [
+            # Affirmative responses (for follow-up from search)
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Yes")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Yes please")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Show me recommendations")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Yes please show me recommendations")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Sure")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Yes I'd like recommendations")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="That would be great")],
+                repeat_count=1
+            ),
+            # Direct requests
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="What pet would be good for me")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Can you recommend a pet")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Which pet should I adopt")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Help me find the right pet")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="I don't know what pet to get")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Recommend a pet for my lifestyle")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="Give me recommendations")],
+                repeat_count=1
+            ),
+            Intent.TrainingPhrase(
+                parts=[Intent.TrainingPhrase.Part(text="I need help choosing a pet")],
+                repeat_count=1
+            )
+        ]
+
+        # Update the intent with new training phrases
+        recommendations_intent.training_phrases.clear()
+        recommendations_intent.training_phrases.extend(training_phrases)
+
+        # Update the intent
+        updated_intent = intents_client.update_intent(intent=recommendations_intent)
+
+        logger.info(f"✓ Updated intent with {len(training_phrases)} training phrases")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"✗ Error updating intent: {e}")
+        return False
+
+
 def update_search_pets_intent(
     project_id: str,
     agent_id: str,
@@ -265,16 +390,25 @@ def main():
     logger.info("========================================")
     logger.info("")
 
-    success = update_search_pets_intent(
+    # Update both intents
+    success_search = update_search_pets_intent(
         project_id=args.project_id,
         agent_id=args.agent_id,
         location=args.location
     )
 
-    if success:
+    logger.info("")
+
+    success_recommendations = update_get_recommendations_intent(
+        project_id=args.project_id,
+        agent_id=args.agent_id,
+        location=args.location
+    )
+
+    if success_search and success_recommendations:
         logger.info("")
         logger.info("========================================")
-        logger.info("✓ Intent Update Complete!")
+        logger.info("✓ Intent Updates Complete!")
         logger.info("========================================")
         logger.info("")
         logger.info("Now users can say things like:")
@@ -282,10 +416,18 @@ def main():
         logger.info("  'Show me cats near Portland'")
         logger.info("And Dialogflow will extract the location and species automatically!")
         logger.info("")
+        logger.info("Users can also respond with:")
+        logger.info("  'Yes' or 'Yes please show me recommendations'")
+        logger.info("And the agent will show personalized recommendations!")
+        logger.info("")
         sys.exit(0)
     else:
         logger.error("")
         logger.error("✗ Intent update failed")
+        if not success_search:
+            logger.error("  - intent.search_pets update failed")
+        if not success_recommendations:
+            logger.error("  - intent.get_recommendations update failed")
         sys.exit(1)
 
 
