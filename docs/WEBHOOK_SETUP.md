@@ -273,32 +273,99 @@ gcloud logs read --service=pawconnect-webhook --limit=50
 
 ### API Key Protection
 
-Never hardcode API keys! Use one of these methods:
+**⚠️ CRITICAL SECURITY WARNING:**
+- **NEVER** pass API keys as plain text in command line arguments
+- **NEVER** hardcode API keys in source code
+- **ALWAYS** use Google Cloud Secret Manager for production deployments
 
-**Option 1: Environment Variables (Current)**
-```bash
-gcloud run services update pawconnect-webhook \
-    --set-env-vars="RESCUEGROUPS_API_KEY=${RESCUEGROUPS_API_KEY}"
-```
+**Option 1: Secret Manager (Recommended for Production)**
 
-**Option 2: Secret Manager (Recommended)**
+Step 1 - Create the secret (one-time setup):
 ```bash
-# Create secret
+# Create secret from stdin (will prompt for value)
 echo -n "your-api-key" | gcloud secrets create rescuegroups-api-key --data-file=-
 
-# Grant access to Cloud Run service
-gcloud secrets add-iam-policy-binding rescuegroups-api-key \
-    --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
-    --role="roles/secretmanager.secretAccessor"
+# Or create from file
+gcloud secrets create rescuegroups-api-key --data-file=path/to/api-key.txt
+```
 
-# Update deployment to use secret
+Step 2 - Grant access to Cloud Run (one-time setup):
+```bash
+# Get your project number
+PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
+
+# Grant access to Cloud Run service account
+gcloud secrets add-iam-policy-binding rescuegroups-api-key \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor"
+```
+
+Step 3 - Deploy webhook with secret:
+```bash
+# Deploy with secret mounted as environment variable
 gcloud run deploy pawconnect-webhook \
-    --set-secrets="RESCUEGROUPS_API_KEY=rescuegroups-api-key:latest"
+    --source . \
+    --region us-central1 \
+    --allow-unauthenticated \
+    --set-env-vars="ENVIRONMENT=production,TESTING_MODE=False,MOCK_APIS=False,GCP_PROJECT_ID=your-project-id,RESCUEGROUPS_BASE_URL=https://api.rescuegroups.org/v5" \
+    --set-secrets="RESCUEGROUPS_API_KEY=rescuegroups-api-key:latest" \
+    --timeout=300
+```
+
+**Important Notes:**
+- The `--set-secrets` flag mounts the secret from Secret Manager as an environment variable
+- Format: `ENV_VAR_NAME=secret-name:version` (use `:latest` for most recent version)
+- The webhook will now have access to `RESCUEGROUPS_API_KEY` without exposing it in logs
+- Secrets are encrypted at rest and in transit
+
+**Option 2: Environment Variables (Local Development Only)**
+```bash
+# ⚠️ Use this ONLY for local testing, NEVER for production!
+# Set in .env file (which is in .gitignore)
+RESCUEGROUPS_API_KEY=your-api-key-here
+
+# Run locally
+python -m pawconnect_ai.dialogflow_webhook
 ```
 
 ## Troubleshooting
 
 ### Common Issues
+
+#### 0. "Pet search service is currently unavailable"
+**Symptom**: Webhook returns "I'm sorry, the pet search service is currently unavailable" or similar message
+
+**Cause**: RescueGroups API client is not initialized because the API key is missing from the Cloud Run environment
+
+**Solution**:
+1. **Check if secret exists**:
+   ```bash
+   gcloud secrets list --filter="name:rescuegroups-api-key"
+   ```
+
+2. **Verify Cloud Run has access**:
+   ```bash
+   gcloud run services describe pawconnect-webhook --region us-central1 --format="value(spec.template.spec.containers[0].env)"
+   ```
+   You should see `RESCUEGROUPS_API_KEY` in the environment variables (not secrets section)
+
+3. **Check startup logs**:
+   ```bash
+   gcloud run services logs read pawconnect-webhook --region us-central1 --limit 20
+   ```
+   Look for: `RescueGroups API configured: Yes` (if No, the key is not loaded)
+
+4. **Redeploy with secret**:
+   ```bash
+   gcloud run deploy pawconnect-webhook \
+       --source . \
+       --region us-central1 \
+       --allow-unauthenticated \
+       --set-env-vars="ENVIRONMENT=production,TESTING_MODE=False,MOCK_APIS=False,GCP_PROJECT_ID=your-project-id" \
+       --set-secrets="RESCUEGROUPS_API_KEY=rescuegroups-api-key:latest"
+   ```
+
+**Important**: Always use `--set-secrets` (not `--set-env-vars`) for sensitive credentials!
 
 #### 1. Webhook timeout
 **Symptom**: "Webhook call failed. Error: DEADLINE_EXCEEDED"

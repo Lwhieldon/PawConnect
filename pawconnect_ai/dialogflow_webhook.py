@@ -251,6 +251,13 @@ async def handle_search_pets(
                 "I need to know your location to search for pets. What's your ZIP code or city?"
             )
 
+        # Check if API client is available
+        if rescuegroups_client is None:
+            logger.error("RescueGroups client not initialized")
+            return create_text_response(
+                "I'm sorry, the pet search service is currently unavailable. Please try again later."
+            )
+
         # Search for pets using RescueGroups API
         logger.info(f"Searching for pets: type={pet_type}, location={location}")
 
@@ -377,25 +384,105 @@ async def handle_get_recommendations(
     session_info: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    Get personalized pet recommendations.
+    Get personalized pet recommendations based on user preferences.
+    Fetches and displays actual pet listings from RescueGroups API.
     """
     try:
         # Extract user preferences from parameters
-        pet_type = parameters.get("pet_type")
+        pet_type = parameters.get("pet_type") or parameters.get("species")
         location = parameters.get("location")
+        housing = parameters.get("housing")
+        experience = parameters.get("experience")
+
+        logger.info(f"Get recommendations - housing: {housing}, experience: {experience}, location: {location}, pet_type: {pet_type}")
 
         if not location:
             return create_text_response(
                 "I need to know your location to find pets near you. What's your ZIP code?"
             )
 
-        response_text = (
-            f"I'll find the best {pet_type or 'pet'} matches for you based on your preferences. "
-            f"To give you the most personalized recommendations, I'd like to ask a few questions. "
-            f"What type of home do you live in? (house, apartment, etc.)"
-        )
+        # Check if API client is available
+        if rescuegroups_client is None:
+            logger.error("RescueGroups client not initialized")
+            return create_text_response(
+                "I'm sorry, the pet recommendation service is currently unavailable. Please try again later."
+            )
 
-        return create_text_response(response_text)
+        # If we have housing and experience, fetch and display actual pets
+        if housing and experience:
+            # Fetch pets from RescueGroups API
+            logger.info(f"Fetching pets for recommendations: type={pet_type}, location={location}")
+
+            result = await rescuegroups_client.search_pets(
+                pet_type=pet_type,
+                location=location,
+                distance=50,
+                limit=5  # Show top 5 recommendations
+            )
+
+            # Check if any pets were found
+            if not result or "data" not in result or not result["data"]:
+                response_text = (
+                    f"I couldn't find any {pet_type or 'pet'}s near {location}. "
+                    "Would you like to expand your search area or try different criteria?"
+                )
+                return create_text_response(response_text)
+
+            # Build response with actual pet listings
+            response_parts = []
+
+            response_parts.append(
+                f"Perfect! Based on your preferences (living in {housing}, "
+                f"{'experienced' if 'yes' in experience.lower() or 'experience' in experience.lower() else 'new to pets'}), "
+                f"here are my top recommendations:\n\n"
+            )
+
+            # Display each pet
+            for idx, pet in enumerate(result["data"][:5], 1):
+                attributes = pet.get("attributes", {})
+
+                name = attributes.get("name", "Unknown")
+                breed = attributes.get("breedString") or attributes.get("breedPrimary", "Mixed breed")
+                age = attributes.get("ageString") or attributes.get("ageGroup", "Unknown age")
+                sex = attributes.get("sex", "Unknown")
+                size = attributes.get("sizeGroup", "")
+
+                # Get pet ID from relationships or id
+                pet_id = pet.get("id", "")
+
+                response_parts.append(
+                    f"{idx}. **{name}** (ID: {pet_id})\n"
+                    f"   • {age} {sex} {breed}\n"
+                )
+
+                if size:
+                    response_parts.append(f"   • Size: {size}\n")
+
+                response_parts.append("\n")
+
+            response_parts.append(
+                "Would you like more information about any of these pets? "
+                "Just tell me the pet's name or ID number!"
+            )
+
+            response_text = "".join(response_parts)
+            return create_text_response(response_text)
+
+        # If missing information, ask for it
+        if not housing:
+            return create_text_response(
+                "What type of housing do you have? (apartment, house, condo, etc.)"
+            )
+
+        if not experience:
+            return create_text_response(
+                "Do you have experience with pets?"
+            )
+
+        # Fallback
+        return create_text_response(
+            f"Let me help you find the perfect {pet_type or 'pet'} based on your preferences!"
+        )
 
     except Exception as e:
         logger.error(f"Error getting recommendations: {e}")
