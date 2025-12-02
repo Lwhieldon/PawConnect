@@ -1,60 +1,75 @@
 # PawConnect Dialogflow CX Setup
 
-Simple, clean setup for your PawConnect Dialogflow CX agent using a single script.
+Complete guide to setting up your PawConnect Dialogflow CX agent using a single consolidated script.
 
-## Quick Start
+## Quick Start (3 Steps)
 
-### Prerequisites
+### 1. Create Agent in Console
 
-1. **Create a Dialogflow CX agent** in the Google Cloud Console:
-   - Go to [Dialogflow CX Console](https://dialogflow.cloud.google.com/cx/)
-   - Create a new agent named "PawConnect AI Agent"
-   - Note your project ID
+1. Go to [Dialogflow CX Console](https://dialogflow.cloud.google.com/cx/)
+2. Click **"Create Agent"**
+3. Configure:
+   - **Display Name**: `PawConnect AI Agent`
+   - **Location**: `us-central1` (or your preferred region)
+   - **Time Zone**: Your timezone
+4. Click **"Create"**
 
-2. **Set up authentication**:
-   ```bash
-   gcloud auth application-default login
-   gcloud config set project YOUR_PROJECT_ID
-   ```
-
-### Setup Your Agent
-
-**Run this ONE command to configure everything:**
+### 2. Authenticate & Install Dependencies
 
 ```bash
-python deployment/dialogflow/setup_agent.py \
-    --project-id YOUR_PROJECT_ID
+# Authenticate with Google Cloud
+gcloud auth application-default login
+
+# Set your project
+gcloud config set project YOUR_PROJECT_ID
+
+# Install Python dependencies
+pip install google-cloud-dialogflow-cx loguru python-dotenv
 ```
 
-That's it! The script will:
-- ✅ Auto-detect your agent ID
-- ✅ Create/update all entity types (housing_type, pet_species, pet_size, pet_age_group)
-- ✅ Create/update all intents with proper parameter annotations
-- ✅ Set up pages and flows with transition routes
-- ✅ Configure welcome message
-- ✅ Set up webhook (if URL provided)
+### 3. Configure & Run Setup
 
-### With Webhook
-
-If you have a webhook deployed, include the URL:
+#### Option A: Using .env File (Recommended)
 
 ```bash
+# Navigate to project root
+cd PawConnect
+
+# Copy .env.example to .env
+cp .env.example .env
+
+# Edit .env file with your settings:
+#   GCP_PROJECT_ID=your-project-id
+#   DIALOGFLOW_AGENT_ID=your-agent-id  # Optional - will auto-detect
+#   DIALOGFLOW_LOCATION=us-central1
+#   DIALOGFLOW_WEBHOOK_URL=https://your-webhook-url/webhook  # Optional
+
+# Run setup (reads from .env automatically)
+python deployment/dialogflow/setup_agent.py
+```
+
+#### Option B: Using Command-Line Arguments
+
+```bash
+# Simple setup (auto-detects agent ID)
+python deployment/dialogflow/setup_agent.py \
+    --project-id YOUR_PROJECT_ID
+
+# With all parameters
 python deployment/dialogflow/setup_agent.py \
     --project-id YOUR_PROJECT_ID \
+    --agent-id YOUR_AGENT_ID \
+    --location us-central1 \
     --webhook-url https://your-webhook-url/webhook
 ```
 
-### Manual Agent ID
+> **Note:** Command-line arguments override .env values if both are specified.
 
-If auto-detection doesn't work, specify the agent ID manually:
+---
 
-```bash
-python deployment/dialogflow/setup_agent.py \
-    --project-id YOUR_PROJECT_ID \
-    --agent-id YOUR_AGENT_ID
-```
+## What Gets Created
 
-## What Gets Configured
+The setup script automatically creates:
 
 ### Entity Types
 - **housing_type**: apartment, house, condo, own, rent, live_with_family
@@ -80,25 +95,11 @@ python deployment/dialogflow/setup_agent.py \
 - **PawConnect Webhook**: Configured with your webhook URL
 - Handles tags: `search-pets`, `get-recommendations`
 
-## Testing
+---
 
-After setup, test in the Dialogflow CX Simulator:
+## Verify Setup
 
-1. **"I want to adopt a dog in Seattle"**
-   - Agent should extract "dog" and "Seattle" automatically
-   - Should not ask "Where do you live?" again
-
-2. **"Yes please show me recommendations"**
-   - Agent should recognize this as intent.get_recommendations
-   - Should transition to Get Recommendations page
-
-3. **"apartment"** (when asked about housing)
-   - Agent should recognize "apartment" as valid housing_type
-   - Should not trigger sys.no-match-default
-
-## Verification
-
-To verify your configuration is correct:
+Check that everything is configured correctly:
 
 ```bash
 python deployment/dialogflow/verify_fixes.py \
@@ -106,33 +107,87 @@ python deployment/dialogflow/verify_fixes.py \
     --agent-id YOUR_AGENT_ID
 ```
 
-This checks:
-- ✓ intent.search_pets has parameter annotations
-- ✓ intent.get_recommendations has affirmative responses
-- ✓ housing_type entity includes apartment/house/condo
+You should see:
+```
+✓ intent.search_pets: PASS
+✓ intent.get_recommendations: PASS
+✓ housing_type entity: PASS
+
+✓ ALL CHECKS PASSED!
+```
+
+---
+
+## Test in Simulator
+
+1. Open [Dialogflow CX Console](https://dialogflow.cloud.google.com/cx/)
+2. Click **"Test Agent"** in the top-right corner
+3. Try these test phrases:
+
+**Test 1: Parameter Extraction**
+```
+User: "I want to adopt a dog in Seattle"
+Expected: Agent extracts "dog" and "Seattle" automatically
+         Should NOT ask "Where do you live?" again
+```
+
+**Test 2: Affirmative Response**
+```
+User: "Yes please show me recommendations"
+Expected: Agent recognizes this as intent.get_recommendations
+         Transitions to Get Recommendations page
+```
+
+**Test 3: Entity Recognition**
+```
+User: "apartment" (when asked about housing)
+Expected: Agent recognizes "apartment" as valid housing_type
+         Should NOT trigger sys.no-match-default
+```
+
+---
 
 ## Troubleshooting
 
-### "Agent not found" error
-Run this to find your agent ID:
+### Agent ID Not Found
+
+Find your agent ID:
 ```bash
-python deployment/dialogflow/list_agents.py --project-id YOUR_PROJECT_ID
+python deployment/dialogflow/list_agents.py \
+    --project-id YOUR_PROJECT_ID
 ```
 
-### Changes not showing in simulator
+### Changes Not Showing in Simulator
+
 1. Wait 2-3 minutes for Google's backend to propagate changes
 2. Clear browser cache or use incognito window
 3. Click "Reset" in the simulator to start fresh conversation
 
-### "sys.no-match-default" errors
-1. Run the setup script again - it's safe to rerun
+### "sys.no-match-default" Errors
+
+1. Run the setup script again (it's safe to rerun):
+   ```bash
+   python deployment/dialogflow/setup_agent.py
+   ```
 2. Wait for propagation (2-3 minutes)
 3. Run verify_fixes.py to confirm configuration
 
+### Permission Errors
+
+Ensure you have the correct permissions:
+```bash
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="user:your-email@example.com" \
+    --role="roles/dialogflow.admin"
+```
+
 ### Still having issues?
+
 1. Check authentication: `gcloud auth application-default login`
 2. Verify project: `gcloud config get-value project`
 3. Check logs in the script output for specific errors
+
+---
 
 ## Updating Configuration
 
@@ -144,8 +199,10 @@ The setup script can be run multiple times safely. It will:
 To update your agent after making changes to the script:
 
 ```bash
-python deployment/dialogflow/setup_agent.py --project-id YOUR_PROJECT_ID
+python deployment/dialogflow/setup_agent.py
 ```
+
+---
 
 ## Files in This Directory
 
@@ -154,8 +211,13 @@ python deployment/dialogflow/setup_agent.py --project-id YOUR_PROJECT_ID
 - **`verify_fixes.py`** - Verify configuration is correct
 - **`list_agents.py`** - List all agents in your project
 
+### Documentation
+- **`README.md`** - This file (complete setup guide)
+- **`CONVERSATION_FLOW.md`** - Visual conversation flow diagrams
+- **`agent-config.yaml`** - Reference configuration
+
 ### Legacy Files (For Reference Only)
-These files are kept for reference but are no longer needed. Everything has been consolidated into `setup_agent.py`:
+The `legacy/` folder contains old scripts that have been consolidated into `setup_agent.py`:
 
 - `setup_dialogflow_automation.py`
 - `setup_complete_automation.py`
@@ -164,6 +226,10 @@ These files are kept for reference but are no longer needed. Everything has been
 - `update_intent_parameters.py`
 - `add_transition_routes.py`
 - `setup-agent.sh`
+
+These files are kept for reference but are no longer needed. Everything has been consolidated into `setup_agent.py`.
+
+---
 
 ## Integration with Webhook
 
@@ -190,8 +256,34 @@ Webhook request format:
 
 See `pawconnect_ai/dialogflow_webhook.py` for webhook implementation.
 
+---
+
+## Next Steps
+
+1. **Configure Webhook** (if not done yet):
+   - Deploy your webhook to Cloud Run
+   - Run setup script with `--webhook-url` parameter
+   - See [docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md) for details
+
+2. **Fine-tune Agent**:
+   - Adjust training phrases in Dialogflow Console
+   - Test various conversation flows
+   - Monitor webhook responses
+
+3. **Deploy to Production**:
+   - Follow [docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md)
+   - Enable logging and monitoring
+   - Set up CI/CD pipeline
+
+---
+
 ## Additional Resources
 
-- [Main Deployment Guide](../../docs/DEPLOYMENT.md)
-- [Dialogflow CX Documentation](https://cloud.google.com/dialogflow/cx/docs)
-- [Webhook Integration Guide](https://cloud.google.com/dialogflow/cx/docs/concept/webhook)
+- **[CONVERSATION_FLOW.md](./CONVERSATION_FLOW.md)** - Visual conversation flows
+- **[docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md)** - Production deployment guide
+- **[Dialogflow CX Documentation](https://cloud.google.com/dialogflow/cx/docs)** - Official docs
+- **[Webhook Integration Guide](https://cloud.google.com/dialogflow/cx/docs/concept/webhook)** - Webhook docs
+
+---
+
+**Setup Time:** ~5 minutes | **Skill Level:** Beginner-friendly

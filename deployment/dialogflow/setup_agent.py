@@ -31,6 +31,8 @@ Usage:
 """
 
 import sys
+import os
+from pathlib import Path
 from typing import Optional, List, Dict
 from google.cloud.dialogflowcx_v3 import (
     AgentsClient,
@@ -54,6 +56,18 @@ from google.cloud.dialogflowcx_v3.types import (
 from google.api_core.client_options import ClientOptions
 from google.protobuf import field_mask_pb2
 from loguru import logger
+
+# Try to load .env file
+try:
+    from dotenv import load_dotenv
+    # Look for .env in project root (2 levels up from this script)
+    env_path = Path(__file__).parent.parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+        logger.info(f"Loaded environment variables from {env_path}")
+except ImportError:
+    # python-dotenv not installed, skip loading .env
+    pass
 
 
 class DialogflowSetup:
@@ -423,38 +437,41 @@ class DialogflowSetup:
         flow_name = default_flow.name
         logger.info(f"  Using flow: {flow_name}")
 
-        # Update START_PAGE with welcome message
-        start_page_name = f"{flow_name}/pages/START_PAGE"
-        start_page = self.pages_client.get_page(name=start_page_name)
-
-        welcome_message = (
-            "Welcome to PawConnect! I'm here to help you find your perfect pet companion. "
-            "I can help you search for pets, learn about specific animals, schedule visits, "
-            "or start an adoption application. What would you like to do?"
-        )
-
-        start_page.entry_fulfillment = Fulfillment(
-            messages=[
-                ResponseMessage(
-                    text=ResponseMessage.Text(text=[welcome_message])
-                )
-            ]
-        )
-
-        self.pages_client.update_page(page=start_page)
-        logger.info("  ✓ Welcome message configured")
-
-        # Get intents
+        # Get intents first (needed for routes)
         intent_search_pets = self._intents_cache.get("intent.search_pets")
         intent_get_recommendations = self._intents_cache.get("intent.get_recommendations")
 
         if not intent_search_pets or not intent_get_recommendations:
-            logger.warning("  Intents not found in cache, skipping route configuration")
+            logger.warning("  Intents not found in cache, skipping page configuration")
             return
 
-        # Create/update pages
+        # List all pages in the flow
         pages_list = list(self.pages_client.list_pages(parent=flow_name))
         pages_by_name = {p.display_name: p for p in pages_list}
+
+        # Find START_PAGE (it's a special page that always exists)
+        start_page = next((p for p in pages_list if p.display_name == "START_PAGE"), None)
+
+        if start_page:
+            # Update START_PAGE with welcome message
+            welcome_message = (
+                "Welcome to PawConnect! I'm here to help you find your perfect pet companion. "
+                "I can help you search for pets, learn about specific animals, schedule visits, "
+                "or start an adoption application. What would you like to do?"
+            )
+
+            start_page.entry_fulfillment = Fulfillment(
+                messages=[
+                    ResponseMessage(
+                        text=ResponseMessage.Text(text=[welcome_message])
+                    )
+                ]
+            )
+
+            self.pages_client.update_page(page=start_page)
+            logger.info("  ✓ Welcome message configured")
+        else:
+            logger.warning("  START_PAGE not found, skipping welcome message")
 
         # Pet Search page
         if "Pet Search" not in pages_by_name:
@@ -560,41 +577,41 @@ class DialogflowSetup:
             logger.info("  ✓ Get Recommendations page exists")
 
         # Add transition routes to START_PAGE
-        logger.info("  Configuring START_PAGE transition routes...")
-        start_page = self.pages_client.get_page(name=start_page_name)
+        if start_page:
+            logger.info("  Configuring START_PAGE transition routes...")
 
-        # Get page references
-        pages_list = list(self.pages_client.list_pages(parent=flow_name))
-        pet_search_page = next((p for p in pages_list if p.display_name == "Pet Search"), None)
-        get_rec_page = next((p for p in pages_list if p.display_name == "Get Recommendations"), None)
+            # Refresh pages list to get newly created pages
+            pages_list = list(self.pages_client.list_pages(parent=flow_name))
+            pet_search_page = next((p for p in pages_list if p.display_name == "Pet Search"), None)
+            get_rec_page = next((p for p in pages_list if p.display_name == "Get Recommendations"), None)
 
-        if pet_search_page and get_rec_page:
-            start_page.transition_routes.clear()
-            start_page.transition_routes.extend([
-                TransitionRoute(
-                    intent=intent_search_pets.name,
-                    target_page=pet_search_page.name,
-                    trigger_fulfillment=Fulfillment(
-                        set_parameter_actions=[
-                            Fulfillment.SetParameterAction(
-                                parameter="location",
-                                value="$session.params.location"
-                            ),
-                            Fulfillment.SetParameterAction(
-                                parameter="species",
-                                value="$session.params.species"
-                            )
-                        ]
+            if pet_search_page and get_rec_page:
+                start_page.transition_routes.clear()
+                start_page.transition_routes.extend([
+                    TransitionRoute(
+                        intent=intent_search_pets.name,
+                        target_page=pet_search_page.name,
+                        trigger_fulfillment=Fulfillment(
+                            set_parameter_actions=[
+                                Fulfillment.SetParameterAction(
+                                    parameter="location",
+                                    value="$session.params.location"
+                                ),
+                                Fulfillment.SetParameterAction(
+                                    parameter="species",
+                                    value="$session.params.species"
+                                )
+                            ]
+                        )
+                    ),
+                    TransitionRoute(
+                        intent=intent_get_recommendations.name,
+                        target_page=get_rec_page.name
                     )
-                ),
-                TransitionRoute(
-                    intent=intent_get_recommendations.name,
-                    target_page=get_rec_page.name
-                )
-            ])
+                ])
 
-            self.pages_client.update_page(page=start_page)
-            logger.info("  ✓ Transition routes configured")
+                self.pages_client.update_page(page=start_page)
+                logger.info("  ✓ Transition routes configured")
 
         logger.info("✓ Flows and pages configured")
 
@@ -649,6 +666,12 @@ def main():
     """Main entry point."""
     import argparse
 
+    # Get defaults from environment variables
+    default_project_id = os.getenv("GCP_PROJECT_ID")
+    default_agent_id = os.getenv("DIALOGFLOW_AGENT_ID")
+    default_location = os.getenv("DIALOGFLOW_LOCATION", "us-central1")
+    default_webhook_url = os.getenv("DIALOGFLOW_WEBHOOK_URL")
+
     parser = argparse.ArgumentParser(
         description="Complete PawConnect Dialogflow CX agent setup",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -656,21 +679,24 @@ def main():
     )
     parser.add_argument(
         "--project-id",
-        required=True,
-        help="GCP project ID"
+        default=default_project_id,
+        required=not default_project_id,
+        help=f"GCP project ID (default: from .env GCP_PROJECT_ID={default_project_id or 'not set'})"
     )
     parser.add_argument(
         "--agent-id",
-        help="Dialogflow CX agent ID (auto-detected if not provided)"
+        default=default_agent_id,
+        help=f"Dialogflow CX agent ID (default: from .env DIALOGFLOW_AGENT_ID={default_agent_id or 'auto-detect'})"
     )
     parser.add_argument(
         "--location",
-        default="us-central1",
-        help="Agent location (default: us-central1)"
+        default=default_location,
+        help=f"Agent location (default: from .env DIALOGFLOW_LOCATION={default_location})"
     )
     parser.add_argument(
         "--webhook-url",
-        help="Webhook URL (e.g., https://your-webhook-url/webhook)"
+        default=default_webhook_url,
+        help=f"Webhook URL (default: from .env DIALOGFLOW_WEBHOOK_URL={default_webhook_url or 'not set'})"
     )
 
     args = parser.parse_args()
@@ -684,7 +710,7 @@ def main():
     )
 
     logger.info("╔════════════════════════════════════════╗")
-    logger.info("║  PawConnect Dialogflow CX Setup       ║")
+    logger.info("║  PawConnect Dialogflow CX Setup        ║")
     logger.info("╚════════════════════════════════════════╝")
     logger.info("")
 
@@ -710,7 +736,7 @@ def main():
 
     if success:
         logger.info("╔════════════════════════════════════════╗")
-        logger.info("║  ✓ Setup Complete!                    ║")
+        logger.info("║  ✓ Setup Complete!                     ║")
         logger.info("╚════════════════════════════════════════╝")
         logger.info("")
         logger.info("Your agent is ready! Test in Dialogflow CX Simulator:")
@@ -721,7 +747,7 @@ def main():
         sys.exit(0)
     else:
         logger.error("╔════════════════════════════════════════╗")
-        logger.error("║  ✗ Setup Failed                       ║")
+        logger.error("║  ✗ Setup Failed                        ║")
         logger.error("╚════════════════════════════════════════╝")
         sys.exit(1)
 

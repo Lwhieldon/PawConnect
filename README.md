@@ -565,9 +565,14 @@ PawConnect/
 │   ├── cloudbuild.yaml           # Google Cloud Build CI/CD
 │   ├── deploy-webhook.sh         # Webhook deployment script
 │   ├── dialogflow/               # Dialogflow CX agent configuration
-│   │   ├── agent.json            # Complete agent configuration (importable)
-│   │   ├── README.md             # Agent import & setup guide
-│   │   └── CONVERSATION_FLOW.md  # Visual conversation flow guide
+│   │   ├── setup_agent.py        # ⭐ Main setup script (reads from .env)
+│   │   ├── verify_fixes.py       # Verify agent configuration
+│   │   ├── list_agents.py        # List all agents in project
+│   │   ├── README.md             # Complete setup guide with quick start
+│   │   ├── CONVERSATION_FLOW.md  # Visual conversation flows
+│   │   ├── agent-config.yaml     # Reference configuration
+│   │   └── legacy/               # Legacy scripts (for reference)
+│   │       └── README.md         # Legacy scripts documentation
 │   ├── scripts/                  # Deployment helper scripts
 │   │   ├── setup-secrets.sh      # Interactive secrets setup
 │   │   ├── load-secrets.sh       # Load secrets to environment (Linux/Mac)

@@ -871,9 +871,20 @@ PawConnect provides a single, simple script to configure your entire Dialogflow 
 gcloud auth application-default login
 
 # 2. Install Python dependencies (if not already installed)
-pip install google-cloud-dialogflow-cx loguru
+pip install google-cloud-dialogflow-cx loguru python-dotenv
 
-# 3. Run the setup script (auto-detects agent ID)
+# 3a. Configure .env file (recommended)
+cp .env.example .env
+# Edit .env and set:
+#   GCP_PROJECT_ID=your-project-id
+#   DIALOGFLOW_AGENT_ID=your-agent-id  # Optional - will auto-detect
+#   DIALOGFLOW_LOCATION=us-central1
+#   DIALOGFLOW_WEBHOOK_URL=https://your-webhook-url/webhook  # Optional
+
+# Run the setup script (reads from .env)
+python deployment/dialogflow/setup_agent.py
+
+# 3b. Or use command-line arguments (overrides .env)
 python deployment/dialogflow/setup_agent.py \
   --project-id $PROJECT_ID
 
