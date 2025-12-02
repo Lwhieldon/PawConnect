@@ -394,6 +394,24 @@ class DialogflowSetup:
             ]
         )
 
+        # Custom location entity (replaces @sys.location for better extraction)
+        # Include major US cities and common ZIP code patterns
+        self.get_or_create_entity_type(
+            "location",
+            [
+                {"value": "Seattle", "synonyms": ["Seattle", "seattle", "98101", "98102", "98103", "98104", "98105", "98106", "98107", "98108", "98109", "98110", "98111", "98112", "98115", "98116", "98117", "98118", "98119", "98121", "98122", "98124", "98125", "98126", "98127", "98129", "98131", "98133", "98134", "98136", "98138", "98139", "98141", "98144", "98145", "98146", "98148", "98154", "98155", "98158", "98160", "98161", "98164", "98165", "98166", "98168", "98170", "98174", "98175", "98177", "98178", "98181", "98184", "98185", "98188", "98190", "98191", "98194", "98195", "98198", "98199"]},
+                {"value": "Portland", "synonyms": ["Portland", "portland", "97201", "97202", "97203", "97204", "97205", "97206", "97209", "97210", "97211", "97212", "97213", "97214", "97215", "97216", "97217", "97218", "97219", "97220", "97221", "97222", "97223", "97224", "97225", "97227", "97228", "97229", "97230", "97231", "97232", "97233", "97236", "97239", "97240", "97242", "97251", "97253", "97254", "97256", "97266", "97267", "97268", "97269", "97280", "97281", "97282", "97283", "97286", "97290", "97291", "97292", "97293", "97294", "97296", "97298"]},
+                {"value": "Boston", "synonyms": ["Boston", "boston", "02108", "02109", "02110", "02111", "02112", "02113", "02114", "02115", "02116", "02117", "02118", "02119", "02120", "02121", "02122", "02123", "02124", "02125", "02126", "02127", "02128", "02129", "02130", "02131", "02132", "02133", "02134", "02135", "02136", "02163", "02196", "02199", "02201", "02203", "02204", "02205", "02206", "02210", "02211", "02212", "02215", "02217", "02222", "02241", "02266", "02283", "02284", "02293", "02297", "02298"]},
+                {"value": "San Francisco", "synonyms": ["San Francisco", "san francisco", "SF", "94102", "94103", "94104", "94105", "94107", "94108", "94109", "94110", "94111", "94112", "94114", "94115", "94116", "94117", "94118", "94119", "94120", "94121", "94122", "94123", "94124", "94125", "94126", "94127", "94128", "94129", "94130", "94131", "94132", "94133", "94134", "94137", "94139", "94140", "94141", "94142", "94143", "94144", "94145", "94146", "94147", "94151", "94158", "94159", "94160", "94161", "94163", "94164", "94172", "94177", "94188"]},
+                {"value": "Los Angeles", "synonyms": ["Los Angeles", "los angeles", "LA", "90001", "90002", "90003", "90004", "90005", "90006", "90007", "90008", "90009", "90010", "90011", "90012", "90013", "90014", "90015", "90016", "90017", "90018", "90019", "90020", "90021", "90022", "90023", "90024", "90025", "90026", "90027", "90028", "90029", "90030", "90031", "90032", "90033", "90034", "90035", "90036", "90037", "90038", "90039", "90040", "90041", "90042", "90043", "90044", "90045", "90046", "90047", "90048", "90049", "90050", "90051", "90052", "90053", "90054", "90055", "90056", "90057", "90058", "90059", "90060", "90061", "90062", "90063", "90064", "90065", "90066", "90067", "90068", "90069", "90070", "90071", "90072", "90073", "90074", "90075", "90076", "90077", "90078", "90079", "90080", "90081", "90082", "90083", "90084", "90086", "90087", "90088", "90089", "90091", "90093", "90095", "90096", "90099"]},
+                {"value": "New York", "synonyms": ["New York", "new york", "NYC", "New York City", "10001", "10002", "10003", "10004", "10005", "10006", "10007", "10009", "10010", "10011", "10012", "10013", "10014", "10016", "10017", "10018", "10019", "10020", "10021", "10022", "10023", "10024", "10025", "10026", "10027", "10028", "10029", "10030", "10031", "10032", "10033", "10034", "10035", "10036", "10037", "10038", "10039", "10040", "10041", "10043", "10044", "10045", "10055", "10060", "10065", "10069", "10075", "10080", "10081", "10087", "10090", "10095", "10103", "10104", "10105", "10106", "10107", "10108", "10109", "10110", "10111", "10112", "10115", "10118", "10119", "10120", "10121", "10122", "10123", "10128", "10151", "10152", "10153", "10154", "10155", "10158", "10162", "10165", "10166", "10167", "10168", "10169", "10170", "10171", "10172", "10173", "10174", "10175", "10176", "10177", "10178", "10179", "10185", "10199"]},
+                {"value": "Chicago", "synonyms": ["Chicago", "chicago", "60601", "60602", "60603", "60604", "60605", "60606", "60607", "60608", "60609", "60610", "60611", "60612", "60613", "60614", "60615", "60616", "60617", "60618", "60619", "60620", "60621", "60622", "60623", "60624", "60625", "60626", "60628", "60629", "60630", "60631", "60632", "60633", "60634", "60636", "60637", "60638", "60639", "60640", "60641", "60642", "60643", "60644", "60645", "60646", "60647", "60649", "60651", "60652", "60653", "60654", "60655", "60656", "60657", "60659", "60660", "60661", "60666", "60668", "60669", "60670", "60673", "60674", "60675", "60677", "60678", "60680", "60681", "60682", "60684", "60685", "60686", "60687", "60688", "60689", "60690", "60691", "60693", "60694", "60695", "60696", "60697", "60699"]},
+                {"value": "Denver", "synonyms": ["Denver", "denver", "80201", "80202", "80203", "80204", "80205", "80206", "80207", "80208", "80209", "80210", "80211", "80212", "80214", "80215", "80216", "80217", "80218", "80219", "80220", "80221", "80222", "80223", "80224", "80225", "80226", "80227", "80228", "80229", "80230", "80231", "80232", "80233", "80234", "80235", "80236", "80237", "80238", "80239", "80243", "80244", "80246", "80247", "80248", "80249", "80250", "80251", "80252", "80256", "80257", "80259", "80260", "80261", "80262", "80263", "80264", "80265", "80266", "80271", "80273", "80274", "80279", "80280", "80281", "80290", "80291", "80293", "80294", "80295", "80299"]},
+                {"value": "Austin", "synonyms": ["Austin", "austin", "78701", "78702", "78703", "78704", "78705", "78712", "78717", "78719", "78721", "78722", "78723", "78724", "78725", "78726", "78727", "78728", "78729", "78730", "78731", "78732", "78733", "78734", "78735", "78736", "78737", "78738", "78739", "78741", "78742", "78744", "78745", "78746", "78747", "78748", "78749", "78750", "78751", "78752", "78753", "78754", "78755", "78756", "78757", "78758", "78759", "78760", "78761", "78762", "78763", "78764", "78765", "78766", "78767", "78768", "78769", "78772", "78773", "78774", "78778", "78779", "78783", "78799"]},
+                {"value": "Phoenix", "synonyms": ["Phoenix", "phoenix", "85001", "85002", "85003", "85004", "85005", "85006", "85007", "85008", "85009", "85010", "85011", "85012", "85013", "85014", "85015", "85016", "85017", "85018", "85019", "85020", "85021", "85022", "85023", "85024", "85026", "85027", "85028", "85029", "85030", "85031", "85032", "85033", "85034", "85035", "85036", "85037", "85038", "85039", "85040", "85041", "85042", "85043", "85044", "85045", "85046", "85048", "85050", "85051", "85053", "85054", "85060", "85061", "85062", "85063", "85064", "85065", "85066", "85067", "85068", "85069", "85070", "85071", "85072", "85073", "85074", "85075", "85076", "85078", "85079", "85080"]}
+            ]
+        )
+
         logger.info("✓ Entity types configured")
 
     def setup_intents(self):
@@ -416,6 +434,9 @@ class DialogflowSetup:
 
         experience_level_entity = self._entity_types_cache.get("experience_level")
         experience_level_path = experience_level_entity.name if experience_level_entity else sys_any
+
+        location_entity = self._entity_types_cache.get("location")
+        location_path = location_entity.name if location_entity else sys_location
 
         # intent.search_pets with parameter annotations
         # Include complex, natural sentences that users actually say
@@ -484,7 +505,7 @@ class DialogflowSetup:
                 [{"text": "I'm looking for a pet to adopt"}]
             ],
             parameters=[
-                {"id": "location", "entity_type": sys_location},  # Use @sys.location for better location extraction
+                {"id": "location", "entity_type": location_path},  # Use custom location entity
                 {"id": "species", "entity_type": pet_species_path},  # Use custom pet_species entity
                 {"id": "breed", "entity_type": dog_breed_path}  # Use @dog_breed (most common breed searches are dogs)
             ]
@@ -736,6 +757,9 @@ class DialogflowSetup:
             dog_breed_entity = self._entity_types_cache.get("dog_breed")
             dog_breed_path = dog_breed_entity.name if dog_breed_entity else "projects/-/locations/-/agents/-/entityTypes/sys.any"
 
+            location_entity = self._entity_types_cache.get("location")
+            location_path = location_entity.name if location_entity else "projects/-/locations/-/agents/-/entityTypes/sys.location"
+
             pet_search_page = self.pages_client.create_page(
                 parent=flow_name,
                 page=Page(
@@ -744,7 +768,7 @@ class DialogflowSetup:
                         parameters=[
                             Form.Parameter(
                                 display_name="location",
-                                entity_type="projects/-/locations/-/agents/-/entityTypes/sys.location",
+                                entity_type=location_path,
                                 required=True,
                                 fill_behavior=Form.Parameter.FillBehavior(
                                     initial_prompt_fulfillment=Fulfillment(
@@ -801,6 +825,9 @@ class DialogflowSetup:
             dog_breed_entity = self._entity_types_cache.get("dog_breed")
             dog_breed_path = dog_breed_entity.name if dog_breed_entity else "projects/-/locations/-/agents/-/entityTypes/sys.any"
 
+            location_entity = self._entity_types_cache.get("location")
+            location_path = location_entity.name if location_entity else "projects/-/locations/-/agents/-/entityTypes/sys.location"
+
             # Create a brand new Page object with all the configuration
             # This avoids protobuf nested type issues when modifying existing objects
             pet_search_page = Page(
@@ -810,7 +837,7 @@ class DialogflowSetup:
                     parameters=[
                         Form.Parameter(
                             display_name="location",
-                            entity_type="projects/-/locations/-/agents/-/entityTypes/sys.location",
+                            entity_type=location_path,
                             required=True,
                             fill_behavior=Form.Parameter.FillBehavior(
                                 initial_prompt_fulfillment=Fulfillment(
@@ -990,19 +1017,11 @@ class DialogflowSetup:
                 start_page.transition_routes.extend([
                     TransitionRoute(
                         intent=intent_search_pets.name,
-                        target_page=pet_search_page.name,
                         trigger_fulfillment=Fulfillment(
-                            set_parameter_actions=[
-                                Fulfillment.SetParameterAction(
-                                    parameter="location",
-                                    value="$session.params.location"
-                                ),
-                                Fulfillment.SetParameterAction(
-                                    parameter="species",
-                                    value="$session.params.species"
-                                )
-                            ]
+                            webhook=webhook_name,
+                            tag="search-pets"
                         )
+                        # Call webhook directly with intent parameters
                     ),
                     TransitionRoute(
                         intent=intent_get_recommendations.name,
@@ -1035,19 +1054,11 @@ class DialogflowSetup:
                 new_routes = [
                     TransitionRoute(
                         intent=intent_search_pets.name,
-                        target_page=pet_search_page.name,
                         trigger_fulfillment=Fulfillment(
-                            set_parameter_actions=[
-                                Fulfillment.SetParameterAction(
-                                    parameter="location",
-                                    value="$session.params.location"
-                                ),
-                                Fulfillment.SetParameterAction(
-                                    parameter="species",
-                                    value="$session.params.species"
-                                )
-                            ]
+                            webhook=webhook_name,
+                            tag="search-pets"
                         )
+                        # Call webhook directly with intent parameters
                     ),
                     TransitionRoute(
                         intent=intent_get_recommendations.name,
