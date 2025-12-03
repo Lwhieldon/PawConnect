@@ -80,7 +80,7 @@ test_*.py
 # DOCUMENTATION & GUIDES
 # ============================================================================
 docs/
-README.md
+# README.md - NEEDED by setup.py for long_description
 README
 LICENSE
 LICENSE.txt
@@ -89,6 +89,7 @@ CHANGELOG.md
 HISTORY.md
 KAGGLE_WRITEUP.md
 *.md
+!README.md
 !requirements.md
 
 # ============================================================================
@@ -109,8 +110,14 @@ datasets/
 *.json
 *.xlsx
 *.parquet
-models/
+# models/ - COMMENTED OUT because pawconnect_ai/models/ is Python source code
 checkpoints/
+*.h5
+*.pkl
+*.pth
+*.onnx
+*.pb
+saved_models/
 
 # ============================================================================
 # LOGS & TEMPORARY FILES
