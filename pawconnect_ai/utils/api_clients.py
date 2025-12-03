@@ -96,28 +96,39 @@ class RescueGroupsClient:
 
         # Add species filter if provided
         if pet_type:
-            # Map common pet types to species names
+            # Map common pet types to species singular names (capitalized)
+            # RescueGroups API v5 uses species.singular field with capitalized values
             species_map = {
                 "dog": "Dog",
                 "dogs": "Dog",
+                "puppy": "Dog",
                 "cat": "Cat",
                 "cats": "Cat",
+                "kitten": "Cat",
                 "rabbit": "Rabbit",
                 "rabbits": "Rabbit",
                 "bird": "Bird",
-                "birds": "Bird"
+                "birds": "Bird",
+                "small_animal": "Small Animal",
+                "smallanimals": "Small Animal"
             }
-            species_name = species_map.get(pet_type.lower(), pet_type.capitalize())
-            filters.append({
-                "fieldName": "species.singular",
-                "operation": "equals",
-                "criteria": species_name
-            })
+            species_singular = species_map.get(pet_type.lower())
+            if species_singular:
+                filters.append({
+                    "fieldName": "species.singular",
+                    "operation": "equals",
+                    "criteria": species_singular
+                })
+            else:
+                logger.warning(f"Unknown pet_type '{pet_type}', skipping species filter")
 
-        # Build request body - v5 uses flat structure, not wrapped in "data"
-        request_body = {
+        # Build data object for request body
+        # Build filterProcessing string (e.g., "1 and 2" for two filters)
+        filter_processing = " and ".join(str(i) for i in range(1, len(filters) + 1))
+
+        data_object = {
             "filters": filters,
-            "filterProcessing": "1",  # Use AND logic
+            "filterProcessing": filter_processing,  # Use explicit AND logic
             "fields": {
                 "animals": [
                     "name", "breedString", "breedPrimary", "breedSecondary",
@@ -148,21 +159,29 @@ class RescueGroupsClient:
 
             if is_zip:
                 # RescueGroups API v5 uses filterRadius object for location-based searches
-                # Note: Some API endpoints may not support filterRadius in public search
-                request_body["filterRadius"] = {
+                data_object["filterRadius"] = {
                     "postalcode": location.strip(),
                     "miles": str(distance)  # Convert to string for API compatibility
                 }
                 logger.info(f"Searching within {distance} miles of ZIP code {location}")
-                logger.debug(f"filterRadius: {request_body['filterRadius']}")
+                logger.debug(f"filterRadius: {data_object['filterRadius']}")
             else:
                 # Not a ZIP code - search all locations
                 logger.info(f"Location '{location}' is not a ZIP code. Searching all locations. For location-specific results, please provide a 5-digit ZIP code.")
 
+        # CRITICAL: Wrap in "data" object per RescueGroups API v5 spec
+        # This is required for filters to be applied correctly
+        request_body = {"data": data_object}
+
+        # Log filters being applied
+        filter_summary = [f"{f['fieldName']}={f['criteria']}" for f in filters]
+        logger.info(f"Search filters: {filter_summary}")
+
         # Log request for debugging
-        api_url = f"{self.base_url}/public/animals/search/available"
-        logger.debug(f"RescueGroups API URL: {api_url}")
-        logger.debug(f"RescueGroups API request: {request_body}")
+        # Use /public/animals/search (not /search/available) per API spec
+        api_url = f"{self.base_url}/public/animals/search"
+        logger.info(f"RescueGroups API URL: {api_url}")
+        logger.info(f"RescueGroups API request body: {request_body}")
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
