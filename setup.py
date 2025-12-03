@@ -19,9 +19,15 @@ base_requirements = [
     "google-cloud-firestore>=2.13.0",
     "google-cloud-vision>=3.5.0",
     "google-cloud-pubsub>=2.18.0",
+    "google-cloud-dialogflow-cx>=1.20.0",
+    "google-cloud-aiplatform>=1.38.0",
+    "redis>=5.0.0",
     "loguru>=0.7.2",
     "numpy>=1.26.0",
     "python-dateutil>=2.8.2",
+    "aiofiles>=23.2.1",
+    "geopy>=2.4.1",
+    "pillow>=10.1.0",
 ]
 
 # Heavy ML dependencies (optional)

@@ -421,7 +421,10 @@ async def handle_validate_pet_id(
             "pet_breed": breed,
             "pet_age": age,
             "pet_sex": sex,
-            "pet_size": size
+            "pet_size": size,
+            # Track that we've loaded pet details to prevent duplicate responses
+            "pet_details_loaded": True,
+            "current_pet_id": pet_id
         }
 
         if org_data:
@@ -475,8 +478,16 @@ async def handle_ask_pet_question(
     Answer questions about the current pet in context.
     """
     try:
+        # Prioritize session parameters which have validated pet info
         pet_id = parameters.get("validated_pet_id") or parameters.get("pet_id")
+
+        # Use session pet_name if available (it's already validated and clean)
+        # Fall back to parameter pet_name only if session doesn't have it
         pet_name = parameters.get("pet_name", "this pet")
+
+        # If pet_name looks suspicious (too long or has question marks), default to "this pet"
+        if pet_name and (len(pet_name) > 20 or '?' in pet_name):
+            pet_name = "this pet"
 
         if not pet_id:
             return create_text_response(
@@ -504,75 +515,64 @@ async def handle_ask_pet_question(
         pet_data = result["data"]
         attributes = pet_data.get("attributes", {})
 
-        # Extract relevant information for answering questions
-        info_parts = []
+        # Get actual pet name from API response
+        actual_pet_name = attributes.get("name", pet_name)
 
-        # Special needs / medical
-        is_special_needs = attributes.get("isSpecialNeeds", False)
-        special_needs_desc = attributes.get("specialNeedsDescription", "")
-
-        if is_special_needs or special_needs_desc:
-            if special_needs_desc:
-                info_parts.append(f"**Special Needs:** {special_needs_desc}")
-            else:
-                info_parts.append(f"**Special Needs:** {pet_name} has special needs that require extra care.")
-        else:
-            info_parts.append(f"{pet_name} does not have any listed special needs or medical issues.")
-
-        # Good with kids/cats/dogs
+        # Extract key information
+        activity_level = attributes.get("activityLevel", "").lower()
+        qualities = attributes.get("qualities", [])
+        is_housetrained = attributes.get("isHousetrained")
         good_with_kids = attributes.get("isGoodWithKids")
         good_with_cats = attributes.get("isGoodWithCats")
         good_with_dogs = attributes.get("isGoodWithDogs")
+        is_special_needs = attributes.get("isSpecialNeeds", False)
+        special_needs_desc = attributes.get("specialNeedsDescription", "")
 
-        compatibility = []
-        if good_with_kids is not None:
-            compatibility.append(f"children: {'Yes' if good_with_kids else 'No'}")
-        if good_with_cats is not None:
-            compatibility.append(f"cats: {'Yes' if good_with_cats else 'No'}")
-        if good_with_dogs is not None:
-            compatibility.append(f"dogs: {'Yes' if good_with_dogs else 'No'}")
+        # Analyze what the user is asking about (from the original text or context)
+        # Build a conversational response based on available information
+        response_parts = []
 
-        if compatibility:
-            info_parts.append(f"**Good with:** {', '.join(compatibility)}")
+        # Check if qualities include leash-related info
+        has_leash_training = any(q for q in qualities if 'leash' in str(q).lower())
 
-        # House training
-        is_housetrained = attributes.get("isHousetrained")
-        if is_housetrained is not None:
-            status = "is" if is_housetrained else "is not"
-            info_parts.append(f"{pet_name} {status} housetrained.")
-
-        # Activity level
-        activity_level = attributes.get("activityLevel")
-        if activity_level:
-            info_parts.append(f"**Activity level:** {activity_level}")
-
-        # Fence needed
-        fence_needed = attributes.get("fenceNeeded")
-        if fence_needed is not None:
-            if fence_needed:
-                info_parts.append(f"{pet_name} needs a fenced yard.")
+        # For walks/exercise questions
+        if has_leash_training:
+            response_parts.append(f"Yes! {actual_pet_name} is leash trained and ready for walks.")
+        elif activity_level:
+            if 'high' in activity_level or 'active' in activity_level:
+                response_parts.append(f"Absolutely! {actual_pet_name} has a {activity_level} activity level and would love regular walks.")
+            elif 'moderate' in activity_level:
+                response_parts.append(f"Yes, {actual_pet_name} has a moderate activity level and would enjoy daily walks.")
+            elif 'low' in activity_level:
+                response_parts.append(f"{actual_pet_name} has a lower activity level, so shorter, gentler walks would be perfect.")
             else:
-                info_parts.append(f"{pet_name} does not require a fenced yard.")
-
-        # Owner experience
-        owner_experience = attributes.get("ownerExperience")
-        if owner_experience:
-            info_parts.append(f"**Recommended experience:** {owner_experience}")
-
-        # Qualities
-        qualities = attributes.get("qualities")
-        if qualities and isinstance(qualities, list):
-            info_parts.append(f"**Qualities:** {', '.join(qualities)}")
-
-        # Build response
-        if len(info_parts) > 0:
-            response_text = f"Here's what I know about {pet_name}:\n\n" + "\n".join(info_parts)
-            response_text += "\n\nWould you like to schedule a visit or submit an adoption application?"
+                response_parts.append(f"{actual_pet_name} has a {activity_level} activity level.")
         else:
-            response_text = (
-                f"I don't have detailed information about {pet_name}'s specific traits at the moment. "
-                f"Would you like to schedule a visit to meet {pet_name} and learn more?"
-            )
+            response_parts.append(f"I don't have specific information about {actual_pet_name}'s walking preferences, but that's a great question to ask the shelter!")
+
+        # Add relevant personality traits if available
+        personality_traits = [q for q in qualities if any(trait in str(q).lower() for trait in ['affectionate', 'friendly', 'playful', 'gentle', 'calm', 'energetic'])]
+        if personality_traits:
+            traits_str = ', '.join(personality_traits[:3])  # Limit to 3 traits
+            response_parts.append(f"{actual_pet_name} is described as {traits_str}.")
+
+        # Add housetraining if relevant
+        if is_housetrained:
+            response_parts.append(f"{actual_pet_name} is also housetrained, which is great!")
+
+        # Build final conversational response
+        response_text = " ".join(response_parts)
+        response_text += f"\n\nWant to schedule a visit to meet {actual_pet_name}?"
+
+        # Track conversation event and analytics
+        session_id = extract_session_id(session_info)
+        event_data = {
+            "pet_id": pet_id,
+            "pet_name": actual_pet_name,
+            "question_type": "pet_question"
+        }
+        await track_conversation_event(session_id, "pet_question_asked", event_data)
+        await publish_analytics("pet_question", event_data)
 
         return create_text_response(response_text)
 

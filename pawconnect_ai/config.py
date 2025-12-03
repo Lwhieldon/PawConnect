@@ -93,6 +93,10 @@ class Settings(BaseSettings):
         default="applications",
         description="Firestore collection for applications"
     )
+    firestore_collection_sessions: str = Field(
+        default="sessions",
+        description="Firestore collection for conversation sessions"
+    )
 
     # Redis/Memorystore
     redis_host: str = Field(default="localhost", description="Redis host")

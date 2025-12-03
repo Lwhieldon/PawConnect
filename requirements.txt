@@ -23,6 +23,7 @@ google-cloud-dialogflow-cx>=1.20.0  # Dialogflow CX automation & webhook
 google-cloud-vision>=3.5.0          # Vision API for pet image analysis
 google-cloud-firestore>=2.13.0      # Firestore database
 google-cloud-pubsub>=2.18.0         # Pub/Sub messaging
+redis>=5.0.0                        # Redis client for caching
 
 # Data Processing & Validation
 numpy>=1.26.0                       # Used in recommendation model
@@ -72,7 +73,6 @@ pre-commit>=3.6.0                   # Pre-commit hooks
 # - tensorflow, torch, transformers (heavy ML, never imported)
 # - scikit-learn, pandas (not imported anywhere)
 # - marshmallow (not used)
-# - redis (configured but not imported)
 # - sqlalchemy, psycopg2-binary (not used)
 # - google-cloud-storage (not imported)
 # - google-cloud-translate (not imported)

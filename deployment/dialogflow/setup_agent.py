@@ -618,37 +618,70 @@ class DialogflowSetup:
         self.get_or_create_intent(
             "intent.ask_pet_question",
             [
-                # Medical/health questions
+                # Medical/health questions with names
                 [{"text": "Does "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " have medical issues"}],
                 [{"text": "Does "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " have any health problems"}],
                 [{"text": "Is "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " healthy"}],
+
+                # Medical/health questions with pronouns
+                [{"text": "Does she have medical issues"}],
+                [{"text": "Does he have medical issues"}],
+                [{"text": "Does she have any health problems"}],
+                [{"text": "Does he have any health problems"}],
+                [{"text": "Is she healthy"}],
+                [{"text": "Is he healthy"}],
                 [{"text": "Does this pet have medical issues"}],
                 [{"text": "Are there any health concerns"}],
                 [{"text": "What are the medical conditions"}],
                 [{"text": "Does the pet need special care"}],
                 [{"text": "Any health issues I should know about"}],
 
-                # Behavior questions
+                # Behavior questions with names
                 [{"text": "Is "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " good with kids"}],
                 [{"text": "Is "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " good with other dogs"}],
                 [{"text": "Is "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " good with cats"}],
+                [{"text": "Does "}, {"text": "Rosie", "parameter_id": "pet_name"}, {"text": " like to go on walks"}],
+
+                # Behavior questions with pronouns
+                [{"text": "Is she good with kids"}],
+                [{"text": "Is he good with kids"}],
+                [{"text": "Is she good with other dogs"}],
+                [{"text": "Is he good with other dogs"}],
+                [{"text": "Is she good with cats"}],
+                [{"text": "Is he good with cats"}],
+                [{"text": "Does she like to go on walks"}],
+                [{"text": "Does he like to go on walks"}],
+                [{"text": "Does she like walks"}],
+                [{"text": "Does he like walks"}],
                 [{"text": "Does this pet get along with children"}],
                 [{"text": "Is the pet house trained"}],
                 [{"text": "How is the pet with other animals"}],
                 [{"text": "What's the pet's temperament"}],
                 [{"text": "Is the pet friendly"}],
+                [{"text": "Is she friendly"}],
+                [{"text": "Is he friendly"}],
 
-                # Care requirements
+                # Care requirements with pronouns
                 [{"text": "How much exercise does "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " need"}],
+                [{"text": "How much exercise does she need"}],
+                [{"text": "How much exercise does he need"}],
                 [{"text": "What are the grooming needs"}],
                 [{"text": "Does the pet need a fenced yard"}],
+                [{"text": "Does she need a fenced yard"}],
+                [{"text": "Does he need a fenced yard"}],
                 [{"text": "What kind of home does this pet need"}],
                 [{"text": "Is this pet suitable for apartments"}],
+                [{"text": "Is she suitable for apartments"}],
+                [{"text": "Is he suitable for apartments"}],
 
                 # General questions
                 [{"text": "Tell me more about "}, {"text": "Lucky", "parameter_id": "pet_name"}],
                 [{"text": "What else should I know about "}, {"text": "Lucky", "parameter_id": "pet_name"}],
                 [{"text": "Can you tell me more about this pet"}],
+                [{"text": "Tell me more about her"}],
+                [{"text": "Tell me more about him"}],
+                [{"text": "What else should I know about her"}],
+                [{"text": "What else should I know about him"}],
                 [{"text": "What's the pet's story"}],
                 [{"text": "Why is this pet up for adoption"}]
             ],
@@ -1146,10 +1179,11 @@ class DialogflowSetup:
             logger.info("  ✓ Pet Details page created with pet_id parameter and validate-pet-id webhook")
         else:
             # Update existing page to ensure webhook route is configured
-            logger.info("  Updating Pet Details page with pet_id parameter and webhook route...")
+            logger.info("  Updating Pet Details page - adding session tracking to prevent double responses...")
             pet_details_page = pages_by_name["Pet Details"]
 
             # Create a brand new Page object with all the configuration
+            # Use session parameter to track if pet details were already loaded
             pet_details_page = Page(
                 name=pet_details_page.name,  # Preserve the page path
                 display_name="Pet Details",
@@ -1172,7 +1206,8 @@ class DialogflowSetup:
                 entry_fulfillment=Fulfillment(),  # Clear to prevent double webhook calls
                 transition_routes=[
                     TransitionRoute(
-                        condition="$page.params.status = \"FINAL\"",
+                        # Only trigger on FINAL if we haven't already loaded details for this pet
+                        condition='$page.params.status = "FINAL" AND ($session.params.current_pet_id != $page.params.pet_id OR NOT $session.params.pet_details_loaded)',
                         trigger_fulfillment=Fulfillment(
                             webhook=webhook_name,
                             tag="validate-pet-id"
@@ -1185,7 +1220,7 @@ class DialogflowSetup:
 
             # Update the page
             self.pages_client.update_page(page=pet_details_page)
-            logger.info("  ✓ Pet Details page updated (pet_id parameter, validate-pet-id webhook)")
+            logger.info("  ✓ Pet Details page updated (session tracking to prevent re-firing)")
 
         # Schedule Visit page
         if "Schedule Visit" not in pages_by_name:
