@@ -87,8 +87,32 @@ class RescueGroupsClient:
         # Build RescueGroups API v5 request body
         filters = []
 
-        # Species is included in the URL path, not as a filter
-        species_path = f"/{pet_type}s" if pet_type else ""
+        # CRITICAL: Filter to only "Available" status pets
+        filters.append({
+            "fieldName": "statuses.name",
+            "operation": "equals",
+            "criteria": "Available"
+        })
+
+        # Add species filter if provided
+        if pet_type:
+            # Map common pet types to species names
+            species_map = {
+                "dog": "Dog",
+                "dogs": "Dog",
+                "cat": "Cat",
+                "cats": "Cat",
+                "rabbit": "Rabbit",
+                "rabbits": "Rabbit",
+                "bird": "Bird",
+                "birds": "Bird"
+            }
+            species_name = species_map.get(pet_type.lower(), pet_type.capitalize())
+            filters.append({
+                "fieldName": "species.singular",
+                "operation": "equals",
+                "criteria": species_name
+            })
 
         # Build request body - v5 uses flat structure, not wrapped in "data"
         request_body = {
@@ -136,7 +160,7 @@ class RescueGroupsClient:
                 logger.info(f"Location '{location}' is not a ZIP code. Searching all locations. For location-specific results, please provide a 5-digit ZIP code.")
 
         # Log request for debugging
-        api_url = f"{self.base_url}/public/animals/search/available{species_path}"
+        api_url = f"{self.base_url}/public/animals/search/available"
         logger.debug(f"RescueGroups API URL: {api_url}")
         logger.debug(f"RescueGroups API request: {request_body}")
 
@@ -160,40 +184,102 @@ class RescueGroupsClient:
                 return await response.json()
 
     async def get_pet(self, pet_id: str) -> Dict[str, Any]:
-        """Get details for a specific pet."""
+        """
+        Get details for a specific pet by ID using the RescueGroups API v5 GET endpoint.
+
+        Args:
+            pet_id: The pet ID to look up
+
+        Returns:
+            Pet details from RescueGroups API in format:
+            {
+                "data": {
+                    "id": "...",
+                    "type": "animals",
+                    "attributes": {...}
+                },
+                "included": [...]
+            }
+            Or empty/error result if not found
+        """
         await self.rate_limiter.acquire()
 
         headers = self._get_headers()
 
-        request_body = {
-            "filters": [{
-                "fieldName": "id",
-                "operation": "equal",
-                "criteria": pet_id
-            }],
-            "fields": {
-                "animals": [
-                    "name", "breedString", "breedPrimary", "breedSecondary",
-                    "ageGroup", "ageString", "birthDate", "sex",
-                    "sizeCurrent", "sizeUOM", "coatLength",
-                    "descriptionText", "descriptionHtml",
-                    "pictureThumbnailUrl", "pictureCount",
-                    "isAdoptionPending", "priority", "rescueId",
-                    "createdDate", "updatedDate"
-                ],
-                "orgs": ["name", "email", "phone", "street", "city", "state", "postalcode", "url"]
-            }
+        # RescueGroups API v5 uses GET /public/animals/{id} for single pet lookup
+        # Documentation: https://api.rescuegroups.org/v5/public/docs
+        api_url = f"{self.base_url}/public/animals/{pet_id}"
+
+        # Add include parameter to fetch organization data
+        params = {
+            "include": "orgs,breeds,species,colors,patterns,statuses"
         }
 
+        logger.info(f"Fetching pet with ID: {pet_id}")
+        logger.debug(f"RescueGroups GET {api_url} with params: {params}")
+
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{self.base_url}/public/animals/search",
+            async with session.get(
+                api_url,
                 headers=headers,
-                json=request_body,
+                params=params,
                 timeout=aiohttp.ClientTimeout(total=settings.api_timeout),
             ) as response:
-                response.raise_for_status()
-                return await response.json()
+                if response.status == 404:
+                    # Pet not found - return empty result
+                    logger.info(f"Pet {pet_id} not found (404)")
+                    return {"data": None}
+
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(
+                        f"RescueGroups API error for pet {pet_id}: {response.status}, "
+                        f"response: {error_text}"
+                    )
+                    # Return empty result instead of raising error
+                    return {"data": None}
+
+                result = await response.json()
+
+                # Log the result for debugging
+                # RescueGroups GET endpoint returns {"data": {...}, "included": [...]}
+                # where data is a SINGLE object (not an array)
+                if result.get("data"):
+                    pet_data = result["data"]
+
+                    # Check if it's an array (shouldn't be for GET, but handle it)
+                    if isinstance(pet_data, list):
+                        logger.warning(f"GET endpoint returned array instead of object")
+                        if len(pet_data) == 0:
+                            logger.info(f"get_pet({pet_id}) returned empty array")
+                            return {"data": None}
+                        # Take first item
+                        pet_data = pet_data[0]
+                        # Update result to have single object
+                        result["data"] = pet_data
+
+                    returned_id = pet_data.get("id")
+                    attributes = pet_data.get("attributes", {})
+                    pet_name = attributes.get("name", "Unknown")
+                    species = attributes.get("species", attributes.get("speciesid", "Unknown"))
+
+                    # Log available attributes for debugging
+                    logger.debug(f"Available attributes for pet {pet_id}: {list(attributes.keys())}")
+
+                    logger.info(
+                        f"get_pet({pet_id}) found: {pet_name} (ID: {returned_id}, Species: {species})"
+                    )
+
+                    # Verify we got the correct pet
+                    if returned_id and str(returned_id) != str(pet_id):
+                        logger.error(
+                            f"API returned wrong pet! Requested: {pet_id}, Got: {returned_id}"
+                        )
+                        return {"data": None}
+                else:
+                    logger.info(f"get_pet({pet_id}) returned no data")
+
+                return result
 
     async def get_organizations(
         self, location: Optional[str] = None, limit: int = 100

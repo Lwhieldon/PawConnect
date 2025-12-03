@@ -171,42 +171,103 @@ async def handle_validate_pet_id(
                 "I'm sorry, the pet lookup service is currently unavailable. Please try again later."
             )
 
-        # Fetch pet details from RescueGroups API
+        # Fetch pet details from RescueGroups API using GET /public/animals/{id}
         logger.info(f"Validating pet ID: {pet_id}")
         result = await rescuegroups_client.get_pet(pet_id)
 
         # Check if pet was found
-        if not result or "data" not in result or not result["data"]:
+        # GET endpoint returns single object in "data", not an array
+        if not result or not result.get("data"):
+            logger.info(f"No pet found for ID: {pet_id}")
             return create_text_response(
                 f"I couldn't find a pet with ID '{pet_id}'. Please check the ID and try again."
             )
 
-        # Extract pet data
-        pet_data = result["data"][0] if isinstance(result["data"], list) else result["data"]
+        # Extract pet data (GET endpoint returns single object, not array)
+        pet_data = result["data"]
         attributes = pet_data.get("attributes", {})
+        returned_pet_id = pet_data.get("id") or attributes.get("id")
 
-        # Parse included organizations
+        # CRITICAL: Verify the returned pet ID matches the requested ID
+        if returned_pet_id and str(returned_pet_id) != str(pet_id):
+            logger.error(
+                f"API returned wrong pet! Requested: {pet_id}, Got: {returned_pet_id}"
+            )
+            return create_text_response(
+                f"I couldn't find a pet with ID '{pet_id}'. Please check the ID and try again."
+            )
+
+        # Parse included data to find species and organization
         included = result.get("included", [])
         org_data = None
+        species_name = None
+
+        # Get species ID from relationships
+        relationships = pet_data.get("relationships", {})
+        species_rel = relationships.get("species", {}).get("data", [])
+        species_id = species_rel[0].get("id") if species_rel else None
+
+        # Find matching items in included array
         for item in included:
             if item.get("type") == "orgs":
                 org_data = item.get("attributes", {})
-                break
+            elif item.get("type") == "species" and item.get("id") == species_id:
+                species_attrs = item.get("attributes", {})
+                species_name = species_attrs.get("singular") or species_attrs.get("plural", "")
+                logger.info(f"Found species from included: {species_name} (ID: {species_id})")
 
-        # Build response with pet information
+        # Extract pet information
         pet_name = attributes.get("name", "this pet")
+        species = species_name or ""  # Use species from included relationships
         breed = attributes.get("breedString", attributes.get("breedPrimary", "Mixed breed"))
         age = attributes.get("ageString", attributes.get("ageGroup", "Unknown age"))
         sex = attributes.get("sex", "Unknown gender")
+        size = attributes.get("sizeGroup", "")
+
+        # Build species description
+        species_text = ""
+        if species:
+            species_lower = species.lower()
+            if species_lower == "dog":
+                species_text = "Dog"
+            elif species_lower == "cat":
+                species_text = "Cat"
+            elif species_lower == "rabbit":
+                species_text = "Rabbit"
+            elif species_lower == "bird":
+                species_text = "Bird"
+            elif species_lower in ["smallfurry", "small furry", "small_furry"]:
+                species_text = "Small Animal"
+            else:
+                species_text = species.capitalize()
+
+        # Build descriptive text
+        description_parts = []
+        if age:
+            description_parts.append(age)
+        if sex:
+            description_parts.append(sex)
+        if size:
+            description_parts.append(size)
+        if species_text:
+            description_parts.append(species_text)
+        if breed and breed != "Mixed breed":
+            description_parts.append(breed)
+        elif breed == "Mixed breed" and species_text:
+            description_parts.append(f"{species_text} Mix")
+
+        description = ", ".join(description_parts) if description_parts else "pet"
 
         # Store pet details in session for later use
         updated_parameters = {
             **parameters,
             "validated_pet_id": pet_id,
             "pet_name": pet_name,
+            "pet_species": species_text,
             "pet_breed": breed,
             "pet_age": age,
-            "pet_sex": sex
+            "pet_sex": sex,
+            "pet_size": size
         }
 
         if org_data:
@@ -214,11 +275,17 @@ async def handle_validate_pet_id(
             updated_parameters["shelter_city"] = org_data.get("city", "")
             updated_parameters["shelter_state"] = org_data.get("state", "")
 
+        shelter_info = updated_parameters.get('shelter_name', 'a local shelter')
+        if updated_parameters.get("shelter_city") and updated_parameters.get("shelter_state"):
+            shelter_info += f" in {updated_parameters['shelter_city']}, {updated_parameters['shelter_state']}"
+
         response_text = (
-            f"Great! I found {pet_name}, a {age} {sex} {breed}. "
-            f"This pet is available at {updated_parameters.get('shelter_name', 'a local shelter')}. "
+            f"Great! I found {pet_name}, a {description}. "
+            f"This pet is available at {shelter_info}. "
             f"Would you like to schedule a visit or submit an adoption application?"
         )
+
+        logger.info(f"Successfully validated pet {pet_id}: {pet_name} ({species_text})")
 
         return create_text_response(
             response_text,
@@ -226,7 +293,10 @@ async def handle_validate_pet_id(
         )
 
     except Exception as e:
-        logger.error(f"Error validating pet ID: {e}")
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"Error validating pet ID {parameters.get('pet_id')}: {str(e)}")
+        logger.error(f"Traceback: {error_details}")
         return create_text_response(
             f"I had trouble looking up pet ID '{parameters.get('pet_id')}'. Please try again or provide a different ID."
         )

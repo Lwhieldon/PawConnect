@@ -909,15 +909,6 @@ python deployment/dialogflow/setup_agent.py \
 - Example: User says "I want to adopt a dog in Seattle" but agent asks "Where do you live?"
 - The script ensures location and species are extracted automatically from the first message
 
-**Verify Configuration:**
-
-```bash
-# Run verification script to confirm everything is configured correctly
-python deployment/dialogflow/verify_fixes.py \
-  --project-id $PROJECT_ID \
-  --agent-id YOUR_AGENT_ID
-```
-
 **Manual Option:**
 
 If you prefer full control, follow the step-by-step guide in **[deployment/dialogflow/README.md](../deployment/dialogflow/README.md)**
@@ -976,14 +967,18 @@ Deploy the webhook service that handles Dialogflow fulfillment requests.
 # Use the deployment script
 chmod +x deployment/deploy-webhook.sh
 
-# Set required environment variables
-export RESCUEGROUPS_API_KEY="your_rescuegroups_api_key"
+# Use variables already declared
+PROJECT_ID="${PROJECT_ID}"
+REGION="${GCP_REGION:-us-central1}"
+SERVICE_NAME="pawconnect-webhook"
+VPC_CONNECTOR="${VPC_CONNECTOR:-pawconnect-connector}"
+SKIP_TESTS="${SKIP_TESTS:-false}"
 
 # Run deployment
 ./deployment/deploy-webhook.sh
 
-# Or deploy manually:
-gcloud run deploy pawconnect-dialogflow-webhook \
+# Or deploy manually (with no tests):
+gcloud run deploy pawconnect-webhook \
   --source . \
   --region $REGION \
   --platform managed \
@@ -1006,7 +1001,7 @@ REDIS_PASSWORD=redis-password:latest" \
   --min-instances 0
 
 # Get webhook URL
-export WEBHOOK_URL=$(gcloud run services describe pawconnect-dialogflow-webhook \
+export WEBHOOK_URL=$(gcloud run services describe pawconnect-webhook \
   --region $REGION --format='value(status.url)')
 
 echo "Dialogflow Webhook URL: $WEBHOOK_URL/webhook"
@@ -1022,12 +1017,27 @@ echo "Dialogflow Webhook URL: $WEBHOOK_URL/webhook"
 
 ### Step 3: Test Webhook Integration
 
+Comprehensive testing ensures your webhook handles all scenarios correctly.
+
+#### 3.1 Quick Health Check
+
 ```bash
-# Test webhook endpoint directly
-curl -X POST $WEBHOOK_URL/webhook \
+# Test webhook health endpoint
+curl -s ${WEBHOOK_URL}/health
+
+# Expected response:
+# {"status":"healthy","service":"pawconnect-dialogflow-webhook"}
+```
+
+#### 3.2 Test Validation Scenarios
+
+**Test Case 1: Missing Pet ID (Expected: Error message)**
+```bash
+# This should return an error message asking for pet ID
+curl -X POST ${WEBHOOK_URL}/webhook \
   -H "Content-Type: application/json" \
   -d '{
-    "detectIntentResponseId": "test-123",
+    "detectIntentResponseId": "test-missing-id",
     "sessionInfo": {
       "parameters": {}
     },
@@ -1040,6 +1050,394 @@ curl -X POST $WEBHOOK_URL/webhook \
     "text": "test",
     "languageCode": "en"
   }'
+
+# Expected response:
+# {"fulfillmentResponse":{"messages":[{"text":{"text":["I need a pet ID to look up. Could you provide the pet's ID number?"]}}]}}
+```
+
+**Test Case 2: Valid Pet ID (Expected: Pet details)**
+```bash
+# Test with real RescueGroups pet IDs (these are actual pets in the system)
+# Try pet ID 10393561 (Rosie - American Pit Bull Terrier Mix)
+curl -X POST ${WEBHOOK_URL}/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "detectIntentResponseId": "test-valid-id",
+    "sessionInfo": {
+      "parameters": {
+        "pet_id": "10393561"
+      }
+    },
+    "fulfillmentInfo": {
+      "tag": "validate-pet-id"
+    },
+    "pageInfo": {
+      "displayName": "Pet Details"
+    },
+    "text": "show me pet 10393561",
+    "languageCode": "en"
+  }'
+
+# Expected response if pet exists: Pet details with species, breed, and shelter info
+# Example: {"fulfillmentResponse":{"messages":[{"text":{"text":["Great! I found Rosie, a 9 Years 1 Month, Female, Medium, Dog, American Pit Bull Terrier / Mixed (short coat). This pet is available at [Shelter Name]. Would you like to schedule a visit or submit an adoption application?"]}}]},"sessionInfo":{"parameters":{"pet_id":"10393561","validated_pet_id":"10393561","pet_name":"Rosie","pet_species":"Dog","pet_breed":"American Pit Bull Terrier / Mixed (short coat)","pet_age":"9 Years 1 Month","pet_sex":"Female","pet_size":"Medium",...}}}
+
+# Alternative test IDs (real pets from RescueGroups):
+# - 10244680 (Lucky - Labrador Retriever / Chow Chow Mix)
+# - 10399685 (Gabrio - American Staffordshire Terrier / Terrier Mix)
+# - 10481659 (Sponsor Joe Sanctuary 2016 - Great Pyrenees / Husky Mix)
+
+# CRITICAL: Verify the validated_pet_id in sessionInfo matches your requested pet_id
+# Now using GET /public/animals/{id} endpoint (fixed in this update)
+```
+
+**Test Case 3: Invalid/Non-existent Pet ID**
+```bash
+# Test with a non-existent pet ID
+curl -X POST ${WEBHOOK_URL}/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "detectIntentResponseId": "test-invalid-id",
+    "sessionInfo": {
+      "parameters": {
+        "pet_id": "99999999"
+      }
+    },
+    "fulfillmentInfo": {
+      "tag": "validate-pet-id"
+    },
+    "pageInfo": {
+      "displayName": "Pet Details"
+    },
+    "text": "show me pet 99999999",
+    "languageCode": "en"
+  }'
+
+# Expected response for non-existent pet:
+# {"fulfillmentResponse":{"messages":[{"text":{"text":["I couldn't find a pet with ID '99999999'. Please check the ID and try again."]}}]}}
+
+# IMPORTANT: Verify that sessionInfo does NOT contain validated_pet_id
+# This ensures the webhook properly rejects invalid pet IDs
+```
+
+#### 3.3 Test Search Functionality
+
+**Test Case 4: Search Pets with Valid Parameters**
+```bash
+# Search for dogs in a specific location
+curl -X POST ${WEBHOOK_URL}/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "detectIntentResponseId": "test-search",
+    "sessionInfo": {
+      "parameters": {
+        "pet_type": "dog",
+        "location": "Seattle"
+      }
+    },
+    "fulfillmentInfo": {
+      "tag": "search-pets"
+    },
+    "pageInfo": {
+      "displayName": "Pet Search"
+    },
+    "text": "find dogs in Seattle",
+    "languageCode": "en"
+  }'
+
+# Expected response: List of available dogs near Seattle
+```
+
+**Test Case 5: Search with Missing Location**
+```bash
+# Search without location
+curl -X POST ${WEBHOOK_URL}/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "detectIntentResponseId": "test-search-no-loc",
+    "sessionInfo": {
+      "parameters": {
+        "pet_type": "cat"
+      }
+    },
+    "fulfillmentInfo": {
+      "tag": "search-pets"
+    },
+    "pageInfo": {
+      "displayName": "Pet Search"
+    },
+    "text": "find cats",
+    "languageCode": "en"
+  }'
+
+# Expected response:
+# {"fulfillmentResponse":{"messages":[{"text":{"text":["I need to know your location to search for pets. What's your ZIP code or city?"]}}]}}
+```
+
+#### 3.4 Test Recommendations
+
+**Test Case 6: Get Recommendations with Complete Preferences**
+```bash
+# Get recommendations with full user profile
+curl -X POST ${WEBHOOK_URL}/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "detectIntentResponseId": "test-recommendations",
+    "sessionInfo": {
+      "parameters": {
+        "pet_type": "dog",
+        "location": "98101",
+        "housing": "apartment",
+        "experience": "yes"
+      }
+    },
+    "fulfillmentInfo": {
+      "tag": "get-recommendations"
+    },
+    "pageInfo": {
+      "displayName": "Recommendations"
+    },
+    "text": "show me recommendations",
+    "languageCode": "en"
+  }'
+
+# Expected response: Personalized list of recommended pets
+```
+
+**Test Case 7: Recommendations with Missing Housing Info**
+```bash
+# Request recommendations without housing type
+curl -X POST ${WEBHOOK_URL}/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "detectIntentResponseId": "test-rec-no-housing",
+    "sessionInfo": {
+      "parameters": {
+        "pet_type": "dog",
+        "location": "Seattle"
+      }
+    },
+    "fulfillmentInfo": {
+      "tag": "get-recommendations"
+    },
+    "pageInfo": {
+      "displayName": "Recommendations"
+    },
+    "text": "recommend pets",
+    "languageCode": "en"
+  }'
+
+# Expected response:
+# {"fulfillmentResponse":{"messages":[{"text":{"text":["What type of housing do you have? (apartment, house, condo, etc.)"]}}]}}
+```
+
+#### 3.5 Test Unknown Webhook Tags
+
+**Test Case 8: Unknown Tag Handler**
+```bash
+# Test with an unknown webhook tag
+curl -X POST ${WEBHOOK_URL}/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "detectIntentResponseId": "test-unknown",
+    "sessionInfo": {
+      "parameters": {}
+    },
+    "fulfillmentInfo": {
+      "tag": "unknown-tag"
+    },
+    "pageInfo": {
+      "displayName": "Test Page"
+    },
+    "text": "test unknown",
+    "languageCode": "en"
+  }'
+
+# Expected response:
+# {"fulfillmentResponse":{"messages":[{"text":{"text":["I'm sorry, I don't know how to handle that request yet."]}}]}}
+```
+
+#### 3.6 Run Automated Test Suite
+
+```bash
+# Run pytest test suite for webhook
+cd PawConnect
+
+# Activate virtual environment (if using)
+# Windows:
+venv\Scripts\activate
+# Mac/Linux:
+source venv/bin/activate
+
+# Run webhook tests
+python -m pytest tests/test_webhook.py -v
+
+# Run with coverage
+python -m pytest tests/test_webhook.py -v --cov=pawconnect_ai.dialogflow_webhook --cov-report=term-missing
+```
+
+#### 3.7 Test in Dialogflow Console
+
+1. Open [Dialogflow CX Console](https://dialogflow.cloud.google.com/cx)
+2. Navigate to your agent
+3. Click **Test Agent** in the top-right
+4. Test the following conversations:
+
+**Conversation 1: Pet Search**
+- User: "I want to adopt a dog"
+- Expected: Agent asks for location
+- User: "Seattle"
+- Expected: Agent shows available dogs
+
+**Conversation 2: Pet ID Lookup**
+- User: "Tell me about pet 12345"
+- Expected: Agent shows pet details or asks for valid ID
+
+**Conversation 3: Recommendations**
+- User: "Show me pet recommendations"
+- Expected: Agent asks for location, housing, experience
+- User provides details
+- Expected: Agent shows personalized recommendations
+
+#### 3.8 Check Webhook Logs
+
+```bash
+# View real-time webhook logs
+gcloud run services logs tail pawconnect-webhook --region ${REGION}
+
+# Query specific errors
+gcloud logging read \
+  "resource.type=cloud_run_revision AND \
+   resource.labels.service_name=pawconnect-webhook AND \
+   severity>=ERROR" \
+  --limit 50 \
+  --format json
+
+# Check webhook invocation count
+gcloud logging read \
+  "resource.type=cloud_run_revision AND \
+   resource.labels.service_name=pawconnect-webhook AND \
+   textPayload:'Received webhook request'" \
+  --limit 100 \
+  --format="table(timestamp,textPayload)"
+```
+
+#### 3.9 Verify Webhook Configuration in Dialogflow
+
+```bash
+# Get webhook URL
+echo "Webhook URL: ${WEBHOOK_URL}/webhook"
+
+# Verify in Dialogflow CX Console:
+# 1. Go to Manage > Webhooks
+# 2. Verify webhook URL matches: ${WEBHOOK_URL}/webhook
+# 3. Confirm timeout is set to 30-60 seconds
+# 4. Test connection using "Test webhook" button
+```
+
+#### 3.10 Performance Testing
+
+```bash
+# Test webhook response time
+time curl -X POST ${WEBHOOK_URL}/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "detectIntentResponseId": "perf-test",
+    "sessionInfo": {
+      "parameters": {"pet_type": "dog", "location": "Seattle"}
+    },
+    "fulfillmentInfo": {
+      "tag": "search-pets"
+    },
+    "pageInfo": {
+      "displayName": "Search"
+    },
+    "text": "find dogs",
+    "languageCode": "en"
+  }'
+
+# Run load test (requires Apache Bench)
+# Windows: Install from https://www.apachehaus.com/cgi-bin/download.plx
+# Mac: brew install apache2-utils
+ab -n 100 -c 10 -T "application/json" \
+  -p webhook_test_payload.json \
+  ${WEBHOOK_URL}/webhook
+```
+
+#### Troubleshooting Webhook Issues
+
+**Issue: "pet lookup service is currently unavailable"**
+- **Cause**: RescueGroups API client not initialized
+- **Solution**: Check secrets are configured:
+  ```bash
+  gcloud secrets versions access latest --secret="rescuegroups-api-key"
+  ```
+
+**Issue: Webhook returns same pet for different pet IDs** ✅ FIXED
+- **Previous Cause**: Was using POST `/public/animals/search` with filters, which doesn't support filtering by ID
+- **Solution**: Now using GET `/public/animals/{id}` endpoint (correct v5 API method)
+- **Note**: GET endpoint returns array in `data`, not single object - code handles both formats
+- **Verification**: Check webhook logs:
+  ```bash
+  gcloud run services logs tail pawconnect-webhook --region ${REGION} | grep "get_pet"
+  ```
+- The webhook verifies the returned pet ID matches the requested ID
+- Check that `validated_pet_id` in the sessionInfo matches the requested `pet_id`
+
+**Issue: Can't tell if pet is a dog or cat** ✅ FIXED
+- **Cause**: Species was in `relationships` -> `included` array, not in pet attributes
+- **Solution**: Webhook now parses species from included relationships array
+- **Implementation**:
+  - Extracts species ID from `relationships.species.data[0].id`
+  - Finds matching species in `included` array by type and ID
+  - Reads species name from `attributes.singular` (e.g., "Dog", "Cat")
+- Look for `pet_species` in the sessionInfo parameters (e.g., "Dog", "Cat", "Rabbit")
+- Species is also included in the response text description
+
+**Issue: Search returning non-available pets** ✅ FIXED
+- **Cause**: No status filtering in search endpoint
+- **Solution**: Added filter to search only "Available" status pets:
+  ```json
+  {
+    "fieldName": "statuses.name",
+    "operation": "equals",
+    "criteria": "Available"
+  }
+  ```
+- Also filters by species using `species.singular` field (Dog, Cat, etc.)
+
+**Issue: Webhook timeout in Dialogflow**
+- **Cause**: Request taking > 30 seconds
+- **Solution**: Increase timeout in Dialogflow webhook settings to 60s
+
+**Issue: "Connection refused" or 404**
+- **Cause**: Webhook URL incorrect or service not deployed
+- **Solution**: Verify webhook URL:
+  ```bash
+  gcloud run services describe pawconnect-webhook \
+    --region ${REGION} \
+    --format='value(status.url)'
+  ```
+
+**Issue: Parameters not extracted correctly**
+- **Cause**: Dialogflow entity extraction issues
+- **Solution**: Review entity types and training phrases in Dialogflow Console
+
+**Debugging Tips:**
+```bash
+# View detailed webhook logs with pet ID verification
+gcloud logging read \
+  "resource.type=cloud_run_revision AND \
+   resource.labels.service_name=pawconnect-webhook AND \
+   (textPayload:'get_pet' OR textPayload:'Pet ID mismatch')" \
+  --limit 50 \
+  --format="table(timestamp,textPayload)"
+
+# Check for API filtering issues
+gcloud logging read \
+  "resource.type=cloud_run_revision AND \
+   resource.labels.service_name=pawconnect-webhook AND \
+   textPayload:'API returned wrong pet'" \
+  --limit 20
 ```
 
 ---
