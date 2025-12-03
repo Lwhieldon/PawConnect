@@ -546,12 +546,26 @@ class DialogflowSetup:
         self.get_or_create_intent(
             "intent.schedule_visit",
             [
+                # Affirmative responses (from Pet Details page)
+                [{"text": "Yes schedule a visit"}],
+                [{"text": "Yes"}],
+                [{"text": "Sure, schedule a visit"}],
+                [{"text": "Yes please"}],
+                [{"text": "That sounds good"}],
+                [{"text": "Let's do that"}],
+                [{"text": "Schedule a visit"}],
+
+                # Direct requests
                 [{"text": "I want to schedule a visit"}],
                 [{"text": "Can I meet the pet"}],
                 [{"text": "Schedule a time to see the pet"}],
                 [{"text": "I'd like to visit the shelter"}],
                 [{"text": "Book a visit"}],
-                [{"text": "Set up an appointment"}]
+                [{"text": "Set up an appointment"}],
+                [{"text": "I want to visit"}],
+                [{"text": "Make an appointment"}],
+                [{"text": "Can I come see the pet"}],
+                [{"text": "I'd like to meet the pet"}]
             ]
         )
 
@@ -597,6 +611,49 @@ class DialogflowSetup:
                 [{"text": "How much exercise does a dog need"}],
                 [{"text": "What should I prepare before adopting"}],
                 [{"text": "What's the adoption process"}]
+            ]
+        )
+
+        # intent.ask_pet_question - asks questions about the current pet in context
+        self.get_or_create_intent(
+            "intent.ask_pet_question",
+            [
+                # Medical/health questions
+                [{"text": "Does "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " have medical issues"}],
+                [{"text": "Does "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " have any health problems"}],
+                [{"text": "Is "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " healthy"}],
+                [{"text": "Does this pet have medical issues"}],
+                [{"text": "Are there any health concerns"}],
+                [{"text": "What are the medical conditions"}],
+                [{"text": "Does the pet need special care"}],
+                [{"text": "Any health issues I should know about"}],
+
+                # Behavior questions
+                [{"text": "Is "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " good with kids"}],
+                [{"text": "Is "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " good with other dogs"}],
+                [{"text": "Is "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " good with cats"}],
+                [{"text": "Does this pet get along with children"}],
+                [{"text": "Is the pet house trained"}],
+                [{"text": "How is the pet with other animals"}],
+                [{"text": "What's the pet's temperament"}],
+                [{"text": "Is the pet friendly"}],
+
+                # Care requirements
+                [{"text": "How much exercise does "}, {"text": "Lucky", "parameter_id": "pet_name"}, {"text": " need"}],
+                [{"text": "What are the grooming needs"}],
+                [{"text": "Does the pet need a fenced yard"}],
+                [{"text": "What kind of home does this pet need"}],
+                [{"text": "Is this pet suitable for apartments"}],
+
+                # General questions
+                [{"text": "Tell me more about "}, {"text": "Lucky", "parameter_id": "pet_name"}],
+                [{"text": "What else should I know about "}, {"text": "Lucky", "parameter_id": "pet_name"}],
+                [{"text": "Can you tell me more about this pet"}],
+                [{"text": "What's the pet's story"}],
+                [{"text": "Why is this pet up for adoption"}]
+            ],
+            parameters=[
+                {"id": "pet_name", "entity_type": "projects/-/locations/-/agents/-/entityTypes/sys.any"}
             ]
         )
 
@@ -696,6 +753,7 @@ class DialogflowSetup:
         intent_search_pets = self._intents_cache.get("intent.search_pets")
         intent_get_recommendations = self._intents_cache.get("intent.get_recommendations")
         intent_get_pet_details = self._intents_cache.get("intent.get_pet_details")
+        intent_ask_pet_question = self._intents_cache.get("intent.ask_pet_question")
 
         if not intent_search_pets or not intent_get_recommendations:
             logger.warning("  Intents not found in cache, skipping page configuration")
@@ -1128,6 +1186,161 @@ class DialogflowSetup:
             # Update the page
             self.pages_client.update_page(page=pet_details_page)
             logger.info("  ✓ Pet Details page updated (pet_id parameter, validate-pet-id webhook)")
+
+        # Schedule Visit page
+        if "Schedule Visit" not in pages_by_name:
+            logger.info("  Creating Schedule Visit page...")
+
+            schedule_visit_page = self.pages_client.create_page(
+                parent=flow_name,
+                page=Page(
+                    display_name="Schedule Visit",
+                    form=Form(
+                        parameters=[
+                            Form.Parameter(
+                                display_name="date",
+                                entity_type="projects/-/locations/-/agents/-/entityTypes/sys.date",
+                                required=True,
+                                fill_behavior=Form.Parameter.FillBehavior(
+                                    initial_prompt_fulfillment=Fulfillment(
+                                        messages=[ResponseMessage(text=ResponseMessage.Text(
+                                            text=["What date would you like to visit?"]
+                                        ))]
+                                    )
+                                )
+                            ),
+                            Form.Parameter(
+                                display_name="time",
+                                entity_type="projects/-/locations/-/agents/-/entityTypes/sys.time",
+                                required=True,
+                                fill_behavior=Form.Parameter.FillBehavior(
+                                    initial_prompt_fulfillment=Fulfillment(
+                                        messages=[ResponseMessage(text=ResponseMessage.Text(
+                                            text=["What time works best for you?"]
+                                        ))]
+                                    )
+                                )
+                            )
+                        ]
+                    ),
+                    transition_routes=[
+                        TransitionRoute(
+                            condition="$page.params.status = \"FINAL\"",
+                            trigger_fulfillment=Fulfillment(
+                                webhook=webhook_name,
+                                tag="schedule-visit"
+                            ) if webhook_name else Fulfillment(
+                                messages=[ResponseMessage(text=ResponseMessage.Text(text=["Scheduling your visit..."]))]
+                            )
+                            # No target specified - let webhook response control the flow
+                        )
+                    ]
+                )
+            )
+            logger.info("  ✓ Schedule Visit page created with date and time parameters")
+        else:
+            # Update existing page
+            logger.info("  Updating Schedule Visit page...")
+            schedule_visit_page = pages_by_name["Schedule Visit"]
+
+            schedule_visit_page = Page(
+                name=schedule_visit_page.name,
+                display_name="Schedule Visit",
+                form=Form(
+                    parameters=[
+                        Form.Parameter(
+                            display_name="date",
+                            entity_type="projects/-/locations/-/agents/-/entityTypes/sys.date",
+                            required=True,
+                            fill_behavior=Form.Parameter.FillBehavior(
+                                initial_prompt_fulfillment=Fulfillment(
+                                    messages=[ResponseMessage(text=ResponseMessage.Text(
+                                        text=["What date would you like to visit?"]
+                                    ))]
+                                )
+                            )
+                        ),
+                        Form.Parameter(
+                            display_name="time",
+                            entity_type="projects/-/locations/-/agents/-/entityTypes/sys.time",
+                            required=True,
+                            fill_behavior=Form.Parameter.FillBehavior(
+                                initial_prompt_fulfillment=Fulfillment(
+                                    messages=[ResponseMessage(text=ResponseMessage.Text(
+                                        text=["What time works best for you?"]
+                                    ))]
+                                )
+                            )
+                        )
+                    ]
+                ),
+                entry_fulfillment=Fulfillment(),
+                transition_routes=[
+                    TransitionRoute(
+                        condition="$page.params.status = \"FINAL\"",
+                        trigger_fulfillment=Fulfillment(
+                            webhook=webhook_name,
+                            tag="schedule-visit"
+                        ) if webhook_name else Fulfillment(
+                            messages=[ResponseMessage(text=ResponseMessage.Text(text=["Scheduling your visit..."]))]
+                        )
+                    )
+                ]
+            )
+
+            self.pages_client.update_page(page=schedule_visit_page)
+            logger.info("  ✓ Schedule Visit page updated")
+
+        # Now update Pet Details page to add transition routes
+        logger.info("  Adding transition routes to Pet Details page...")
+        pages_list = list(self.pages_client.list_pages(parent=flow_name))
+        pet_details_page = next((p for p in pages_list if p.display_name == "Pet Details"), None)
+        schedule_visit_page = next((p for p in pages_list if p.display_name == "Schedule Visit"), None)
+        intent_schedule_visit = self._intents_cache.get("intent.schedule_visit")
+        intent_ask_pet_question = self._intents_cache.get("intent.ask_pet_question")
+
+        if pet_details_page and intent_schedule_visit:
+            # Get the current page
+            pet_details_full = self.pages_client.get_page(name=pet_details_page.name)
+
+            # Add intent-based transition routes (these run AFTER webhook completes)
+            # Clear existing intent routes to avoid duplicates
+            existing_routes = [r for r in pet_details_full.transition_routes if not r.intent]
+
+            # Add our new routes
+            new_routes = []
+
+            # Add schedule visit route
+            if schedule_visit_page:
+                new_routes.append(
+                    TransitionRoute(
+                        intent=intent_schedule_visit.name,
+                        target_page=schedule_visit_page.name
+                    )
+                )
+
+            # Add ask pet question route (stays on Pet Details page, calls webhook)
+            if intent_ask_pet_question:
+                new_routes.append(
+                    TransitionRoute(
+                        intent=intent_ask_pet_question.name,
+                        trigger_fulfillment=Fulfillment(
+                            webhook=webhook_name,
+                            tag="ask-pet-question"
+                        ) if webhook_name else Fulfillment(
+                            messages=[ResponseMessage(text=ResponseMessage.Text(text=["Let me look that up for you..."]))]
+                        )
+                        # No target page - stay on Pet Details page
+                    )
+                )
+
+            pet_details_full.transition_routes.clear()
+            pet_details_full.transition_routes.extend(existing_routes + new_routes)
+
+            self.pages_client.update_page(page=pet_details_full)
+            logger.info("  ✓ Added routes: Pet Details -> (intent.schedule_visit) -> Schedule Visit")
+            if intent_ask_pet_question:
+                logger.info("  ✓ Added route: Pet Details -> (intent.ask_pet_question) -> webhook -> stay on page")
 
         # Add transition routes to START_PAGE
         if start_page:

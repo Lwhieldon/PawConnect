@@ -19,12 +19,13 @@ logger.info("Starting PawConnect Dialogflow Webhook...")
 
 try:
     # Import API clients - may initialize with default/missing config
-    from .utils.api_clients import rescuegroups_client
+    from .utils.api_clients import rescuegroups_client, google_cloud_client
     logger.info("Successfully imported API clients")
 except Exception as e:
     logger.error(f"Failed to import API clients: {e}")
     logger.warning("Continuing startup - API clients may not be fully initialized")
     rescuegroups_client = None
+    google_cloud_client = None
 
 
 # Initialize FastAPI app
@@ -98,6 +99,95 @@ async def health_check():
     return {"status": "healthy", "service": "pawconnect-dialogflow-webhook"}
 
 
+def extract_session_id(session_info: Dict[str, Any]) -> str:
+    """
+    Extract session ID from Dialogflow session info.
+
+    Args:
+        session_info: Dialogflow session information
+
+    Returns:
+        Session ID string
+    """
+    # Example session: "projects/PROJECT/locations/LOCATION/agents/AGENT/sessions/SESSION_ID"
+    session = session_info.get("session", "")
+    if "/" in session:
+        return session.split("/")[-1]
+    return session or "unknown"
+
+
+async def track_user_preferences(session_id: str, parameters: Dict[str, Any]) -> None:
+    """
+    Track and store user preferences in Firestore.
+
+    Args:
+        session_id: Dialogflow session ID
+        parameters: Session parameters containing user preferences
+    """
+    if not google_cloud_client:
+        return
+
+    try:
+        preferences = {}
+
+        # Extract preference parameters
+        if "location" in parameters:
+            preferences["location"] = parameters["location"]
+        if "species" in parameters:
+            preferences["species"] = parameters["species"]
+        if "housing" in parameters:
+            preferences["housing"] = parameters["housing"]
+        if "experience" in parameters:
+            preferences["experience"] = parameters["experience"]
+        if "distance" in parameters:
+            preferences["search_radius"] = parameters["distance"]
+
+        if preferences:
+            google_cloud_client.update_user_preferences(session_id, preferences)
+            logger.info(f"Updated preferences for session {session_id}: {preferences}")
+    except Exception as e:
+        logger.error(f"Failed to save user preferences: {e}")
+
+
+async def track_conversation_event(
+    session_id: str,
+    event_type: str,
+    event_data: Dict[str, Any]
+) -> None:
+    """
+    Track conversation event in Firestore.
+
+    Args:
+        session_id: Dialogflow session ID
+        event_type: Type of event
+        event_data: Event data
+    """
+    if not google_cloud_client:
+        return
+
+    try:
+        google_cloud_client.save_conversation_event(session_id, event_type, event_data)
+    except Exception as e:
+        logger.error(f"Failed to save conversation event: {e}")
+
+
+async def publish_analytics(event_type: str, event_data: Dict[str, Any]) -> None:
+    """
+    Publish analytics event to Pub/Sub.
+
+    Args:
+        event_type: Type of event
+        event_data: Event data
+    """
+    if not google_cloud_client:
+        return
+
+    try:
+        await google_cloud_client.publish_analytics_event(event_type, event_data)
+    except Exception as e:
+        logger.error(f"Failed to publish analytics event: {e}")
+
+
 @app.post("/webhook")
 async def dialogflow_webhook(request: Request):
     """
@@ -114,16 +204,22 @@ async def dialogflow_webhook(request: Request):
         body = await request.json()
         logger.info(f"Received webhook request: {body}")
 
-        # Extract webhook tag
+        # Extract webhook tag and session info
         tag = body.get("fulfillmentInfo", {}).get("tag")
         session_info = body.get("sessionInfo", {})
         parameters = session_info.get("parameters", {})
+        session_id = extract_session_id(session_info)
+
+        # Track user preferences (async, non-blocking)
+        await track_user_preferences(session_id, parameters)
 
         # Route to appropriate handler based on tag
         if tag == "search-pets":
             response = await handle_search_pets(parameters, session_info)
         elif tag == "validate-pet-id":
             response = await handle_validate_pet_id(parameters, session_info)
+        elif tag == "ask-pet-question":
+            response = await handle_ask_pet_question(parameters, session_info)
         elif tag == "schedule-visit":
             response = await handle_schedule_visit(parameters, session_info)
         elif tag == "submit-application":
@@ -171,9 +267,67 @@ async def handle_validate_pet_id(
                 "I'm sorry, the pet lookup service is currently unavailable. Please try again later."
             )
 
-        # Fetch pet details from RescueGroups API using GET /public/animals/{id}
-        logger.info(f"Validating pet ID: {pet_id}")
-        result = await rescuegroups_client.get_pet(pet_id)
+        # Check if pet_id is a name (non-numeric) instead of an ID
+        if not str(pet_id).isdigit():
+            logger.info(f"pet_id '{pet_id}' appears to be a name, not an ID. Searching by name...")
+
+            # Search for pets with this name
+            # Get location from session for the search
+            location = parameters.get("last_search_location") or parameters.get("location")
+            pet_type = parameters.get("species") or parameters.get("pet_type")
+
+            if not location:
+                return create_text_response(
+                    f"I found '{pet_id}' in your recent search, but I need your location to look up the details. "
+                    "Could you tell me your ZIP code or city?"
+                )
+
+            # Search for pets matching this name
+            search_result = await rescuegroups_client.search_pets(
+                pet_type=pet_type,
+                location=location,
+                distance=100,
+                limit=50
+            )
+
+            # Look for pets with matching names
+            matching_pets = []
+            if search_result and "data" in search_result:
+                for pet_data in search_result["data"]:
+                    attributes = pet_data.get("attributes", {})
+                    pet_name = attributes.get("name", "")
+                    if pet_name.lower() == str(pet_id).lower():
+                        matching_pets.append(pet_data)
+
+            if not matching_pets:
+                return create_text_response(
+                    f"I couldn't find a pet named '{pet_id}' in your area. "
+                    "Could you provide the pet's ID number instead? "
+                    "You can find it in the recommendations I showed earlier."
+                )
+
+            if len(matching_pets) > 1:
+                # Multiple pets with the same name - ask for ID
+                return create_text_response(
+                    f"I found {len(matching_pets)} pets named '{pet_id}'. "
+                    "Could you provide the pet's ID number to help me identify the right one? "
+                    "You can find it in the recommendations (e.g., ID: 12345)."
+                )
+
+            # Found exactly one match - use its ID
+            pet_data = matching_pets[0]
+            pet_id = pet_data.get("id")
+            logger.info(f"Found pet by name '{parameters.get('pet_id')}' with ID: {pet_id}")
+
+            # Update the result to use this pet_data
+            result = {
+                "data": pet_data,
+                "included": search_result.get("included", [])
+            }
+        else:
+            # Fetch pet details from RescueGroups API using GET /public/animals/{id}
+            logger.info(f"Validating pet ID: {pet_id}")
+            result = await rescuegroups_client.get_pet(pet_id)
 
         # Check if pet was found
         # GET endpoint returns single object in "data", not an array
@@ -287,6 +441,17 @@ async def handle_validate_pet_id(
 
         logger.info(f"Successfully validated pet {pet_id}: {pet_name} ({species_text})")
 
+        # Track conversation event and analytics
+        session_id = extract_session_id(session_info)
+        event_data = {
+            "pet_id": pet_id,
+            "pet_name": pet_name,
+            "pet_species": species_text,
+            "shelter_name": updated_parameters.get("shelter_name")
+        }
+        await track_conversation_event(session_id, "pet_details_viewed", event_data)
+        await publish_analytics("pet_details_view", event_data)
+
         return create_text_response(
             response_text,
             session_parameters=updated_parameters
@@ -299,6 +464,126 @@ async def handle_validate_pet_id(
         logger.error(f"Traceback: {error_details}")
         return create_text_response(
             f"I had trouble looking up pet ID '{parameters.get('pet_id')}'. Please try again or provide a different ID."
+        )
+
+
+async def handle_ask_pet_question(
+    parameters: Dict[str, Any],
+    session_info: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Answer questions about the current pet in context.
+    """
+    try:
+        pet_id = parameters.get("validated_pet_id") or parameters.get("pet_id")
+        pet_name = parameters.get("pet_name", "this pet")
+
+        if not pet_id:
+            return create_text_response(
+                "I need to know which pet you're asking about. Could you tell me the pet's name or ID?"
+            )
+
+        # Check if API client is available
+        if rescuegroups_client is None:
+            logger.error("RescueGroups client not initialized")
+            return create_text_response(
+                "I'm sorry, the pet information service is currently unavailable. Please try again later."
+            )
+
+        # Fetch full pet details from RescueGroups API
+        logger.info(f"Fetching details for pet ID: {pet_id}")
+        result = await rescuegroups_client.get_pet(pet_id)
+
+        if not result or not result.get("data"):
+            logger.info(f"No pet found for ID: {pet_id}")
+            return create_text_response(
+                f"I couldn't find information about {pet_name}. Please check the pet ID."
+            )
+
+        # Extract pet data
+        pet_data = result["data"]
+        attributes = pet_data.get("attributes", {})
+
+        # Extract relevant information for answering questions
+        info_parts = []
+
+        # Special needs / medical
+        is_special_needs = attributes.get("isSpecialNeeds", False)
+        special_needs_desc = attributes.get("specialNeedsDescription", "")
+
+        if is_special_needs or special_needs_desc:
+            if special_needs_desc:
+                info_parts.append(f"**Special Needs:** {special_needs_desc}")
+            else:
+                info_parts.append(f"**Special Needs:** {pet_name} has special needs that require extra care.")
+        else:
+            info_parts.append(f"{pet_name} does not have any listed special needs or medical issues.")
+
+        # Good with kids/cats/dogs
+        good_with_kids = attributes.get("isGoodWithKids")
+        good_with_cats = attributes.get("isGoodWithCats")
+        good_with_dogs = attributes.get("isGoodWithDogs")
+
+        compatibility = []
+        if good_with_kids is not None:
+            compatibility.append(f"children: {'Yes' if good_with_kids else 'No'}")
+        if good_with_cats is not None:
+            compatibility.append(f"cats: {'Yes' if good_with_cats else 'No'}")
+        if good_with_dogs is not None:
+            compatibility.append(f"dogs: {'Yes' if good_with_dogs else 'No'}")
+
+        if compatibility:
+            info_parts.append(f"**Good with:** {', '.join(compatibility)}")
+
+        # House training
+        is_housetrained = attributes.get("isHousetrained")
+        if is_housetrained is not None:
+            status = "is" if is_housetrained else "is not"
+            info_parts.append(f"{pet_name} {status} housetrained.")
+
+        # Activity level
+        activity_level = attributes.get("activityLevel")
+        if activity_level:
+            info_parts.append(f"**Activity level:** {activity_level}")
+
+        # Fence needed
+        fence_needed = attributes.get("fenceNeeded")
+        if fence_needed is not None:
+            if fence_needed:
+                info_parts.append(f"{pet_name} needs a fenced yard.")
+            else:
+                info_parts.append(f"{pet_name} does not require a fenced yard.")
+
+        # Owner experience
+        owner_experience = attributes.get("ownerExperience")
+        if owner_experience:
+            info_parts.append(f"**Recommended experience:** {owner_experience}")
+
+        # Qualities
+        qualities = attributes.get("qualities")
+        if qualities and isinstance(qualities, list):
+            info_parts.append(f"**Qualities:** {', '.join(qualities)}")
+
+        # Build response
+        if len(info_parts) > 0:
+            response_text = f"Here's what I know about {pet_name}:\n\n" + "\n".join(info_parts)
+            response_text += "\n\nWould you like to schedule a visit or submit an adoption application?"
+        else:
+            response_text = (
+                f"I don't have detailed information about {pet_name}'s specific traits at the moment. "
+                f"Would you like to schedule a visit to meet {pet_name} and learn more?"
+            )
+
+        return create_text_response(response_text)
+
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        logger.error(f"Error answering pet question: {e}")
+        logger.error(f"Traceback: {error_details}")
+        return create_text_response(
+            f"I had trouble finding that information about {parameters.get('pet_name', 'this pet')}. "
+            "What else would you like to know?"
         )
 
 
@@ -413,6 +698,17 @@ async def handle_search_pets(
             f"based on your preferences?"
         )
 
+        # Track conversation event and analytics
+        session_id = extract_session_id(session_info)
+        event_data = {
+            "pet_type": pet_type,
+            "location": location,
+            "breed": breed,
+            "results_count": pet_count
+        }
+        await track_conversation_event(session_id, "search_pets", event_data)
+        await publish_analytics("pet_search", event_data)
+
         return create_text_response(
             response_text,
             session_parameters=updated_parameters
@@ -433,34 +729,97 @@ async def handle_schedule_visit(
     Schedule a visit to meet a pet.
     """
     try:
+        from datetime import datetime
+
         pet_id = parameters.get("validated_pet_id") or parameters.get("pet_id")
         pet_name = parameters.get("pet_name", "the pet")
-        date = parameters.get("date")
-        time = parameters.get("time")
+        date_param = parameters.get("date")
+        time_param = parameters.get("time")
 
         if not pet_id:
             return create_text_response(
                 "Which pet would you like to visit? Please provide the pet's ID."
             )
 
-        if not date or not time:
+        if not date_param or not time_param:
             return create_text_response(
                 f"When would you like to visit {pet_name}? Please provide both a date and time."
             )
+
+        # Parse date from Dialogflow's sys.date format
+        # The date parameter comes as a dict with year, month, day, and sometimes future/past/partial
+        date_str = None
+        if isinstance(date_param, dict):
+            # Prefer "future" if available (for relative dates like "this Saturday")
+            # Otherwise use the top-level year/month/day
+            date_dict = date_param.get("future") or date_param
+
+            year = int(date_dict.get("year", 0))
+            month = int(date_dict.get("month", 0))
+            day = int(date_dict.get("day", 0))
+
+            if year > 0 and month > 0 and day > 0:
+                try:
+                    date_obj = datetime(year, month, day)
+                    # Format as "Saturday, December 7, 2025"
+                    date_str = date_obj.strftime("%A, %B %d, %Y")
+                except ValueError:
+                    date_str = f"{month}/{day}/{year}"
+        elif isinstance(date_param, str):
+            date_str = date_param
+        else:
+            date_str = str(date_param)
+
+        # Parse time from Dialogflow's sys.time format
+        # The time parameter comes as a dict with hours, minutes, seconds, nanos
+        time_str = None
+        if isinstance(time_param, dict):
+            hours = int(time_param.get("hours", 0))
+            minutes = int(time_param.get("minutes", 0))
+
+            # Convert to 12-hour format with AM/PM
+            if hours == 0:
+                time_str = f"12:{minutes:02d} AM"
+            elif hours < 12:
+                time_str = f"{hours}:{minutes:02d} AM"
+            elif hours == 12:
+                time_str = f"12:{minutes:02d} PM"
+            else:
+                time_str = f"{hours - 12}:{minutes:02d} PM"
+        elif isinstance(time_param, str):
+            time_str = time_param
+        else:
+            time_str = str(time_param)
 
         # Here you would integrate with your calendar/scheduling system
         # For now, we'll create a confirmation message
 
         response_text = (
-            f"Perfect! I've scheduled your visit to meet {pet_name} on {date} at {time}. "
+            f"Perfect! I've scheduled your visit to meet {pet_name} on {date_str} at {time_str}. "
             f"You'll receive a confirmation email shortly with the shelter's address and "
             f"any specific instructions. Is there anything else I can help you with?"
         )
 
+        # Track conversation event and analytics
+        session_id = extract_session_id(session_info)
+        event_data = {
+            "pet_id": pet_id,
+            "pet_name": pet_name,
+            "visit_date": date_str,
+            "visit_time": time_str
+        }
+        await track_conversation_event(session_id, "visit_scheduled", event_data)
+        await publish_analytics("visit_scheduled", event_data)
+
         return create_text_response(response_text)
 
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         logger.error(f"Error scheduling visit: {e}")
+        logger.error(f"Traceback: {error_details}")
+        logger.error(f"Date param: {parameters.get('date')}")
+        logger.error(f"Time param: {parameters.get('time')}")
         return create_text_response(
             "I had trouble scheduling your visit. Please try again."
         )
@@ -490,6 +849,15 @@ async def handle_submit_application(
             f"I'll need some information from you to complete the application. "
             f"Let's start with your contact details. What's your full name?"
         )
+
+        # Track conversation event and analytics
+        session_id = extract_session_id(session_info)
+        event_data = {
+            "pet_id": pet_id,
+            "pet_name": pet_name
+        }
+        await track_conversation_event(session_id, "application_started", event_data)
+        await publish_analytics("application_started", event_data)
 
         return create_text_response(response_text)
 
@@ -602,6 +970,19 @@ async def handle_get_recommendations(
             )
 
             response_text = "".join(response_parts)
+
+            # Track conversation event and analytics
+            session_id = extract_session_id(session_info)
+            event_data = {
+                "pet_type": pet_type,
+                "location": location,
+                "housing": housing,
+                "experience": experience,
+                "recommendations_count": len(result["data"][:5])
+            }
+            await track_conversation_event(session_id, "get_recommendations", event_data)
+            await publish_analytics("pet_recommendations", event_data)
+
             return create_text_response(response_text)
 
         # If missing information, ask for it

@@ -5,6 +5,8 @@ Handles communication with RescueGroups, Google Cloud services, and other extern
 
 import asyncio
 import time
+import json
+import hashlib
 from typing import List, Dict, Any, Optional
 import aiohttp
 import requests
@@ -80,6 +82,24 @@ class RescueGroupsClient:
         Returns:
             Search results from RescueGroups API
         """
+        # Check Redis cache first
+        # Use global google_cloud_client instance (defined at bottom of file)
+        global google_cloud_client
+        if google_cloud_client:
+            cache_key = google_cloud_client.generate_cache_key(
+                "pet_search",
+                pet_type=pet_type,
+                location=location,
+                distance=distance,
+                limit=limit,
+                page=page,
+                **kwargs
+            )
+            cached_result = google_cloud_client.get_cache(cache_key)
+            if cached_result:
+                logger.info("Returning cached search results")
+                return cached_result
+
         await self.rate_limiter.acquire()
 
         headers = self._get_headers()
@@ -200,7 +220,12 @@ class RescueGroupsClient:
                         f"response='{error_text}'"
                     )
                 response.raise_for_status()
-                return await response.json()
+
+                # Get result and cache it
+                result = await response.json()
+                if google_cloud_client:
+                    google_cloud_client.set_cache(cache_key, result)
+                return result
 
     async def get_pet(self, pet_id: str) -> Dict[str, Any]:
         """
@@ -221,6 +246,16 @@ class RescueGroupsClient:
             }
             Or empty/error result if not found
         """
+        # Check Redis cache first
+        # Use global google_cloud_client instance (defined at bottom of file)
+        global google_cloud_client
+        if google_cloud_client:
+            cache_key = google_cloud_client.generate_cache_key("pet_details", pet_id=pet_id)
+            cached_result = google_cloud_client.get_cache(cache_key)
+            if cached_result:
+                logger.info(f"Returning cached pet details for {pet_id}")
+                return cached_result
+
         await self.rate_limiter.acquire()
 
         headers = self._get_headers()
@@ -298,6 +333,9 @@ class RescueGroupsClient:
                 else:
                     logger.info(f"get_pet({pet_id}) returned no data")
 
+                # Cache the result (even if data is None, to avoid repeated lookups)
+                if google_cloud_client:
+                    google_cloud_client.set_cache(cache_key, result)
                 return result
 
     async def get_organizations(
@@ -352,6 +390,7 @@ class GoogleCloudClient:
         self._firestore_client = None
         self._pubsub_publisher = None
         self._pubsub_subscriber = None
+        self._redis_client = None
 
     @property
     def vision_client(self):
@@ -388,6 +427,33 @@ class GoogleCloudClient:
 
             self._pubsub_subscriber = pubsub_v1.SubscriberClient()
         return self._pubsub_subscriber
+
+    @property
+    def redis_client(self):
+        """Get or create Redis client."""
+        if self._redis_client is None:
+            import redis
+
+            # Create Redis connection
+            self._redis_client = redis.Redis(
+                host=settings.redis_host,
+                port=settings.redis_port,
+                db=settings.redis_db,
+                password=settings.redis_password,
+                decode_responses=True,  # Automatically decode responses to strings
+                socket_timeout=5,
+                socket_connect_timeout=5,
+            )
+
+            # Test connection
+            try:
+                self._redis_client.ping()
+                logger.info("Successfully connected to Redis")
+            except Exception as e:
+                logger.warning(f"Failed to connect to Redis: {e}. Caching will be disabled.")
+                self._redis_client = None
+
+        return self._redis_client
 
     async def analyze_image(self, image_uri: str) -> Dict[str, Any]:
         """
@@ -493,6 +559,163 @@ class GoogleCloudClient:
         if doc.exists:
             return doc.to_dict()
         return None
+
+    def update_user_preferences(
+        self, user_id: str, preferences: Dict[str, Any], merge: bool = True
+    ) -> None:
+        """
+        Update user preferences in Firestore.
+
+        Args:
+            user_id: Unique user identifier (session ID)
+            preferences: User preferences to save
+            merge: If True, merge with existing data; if False, overwrite
+        """
+        collection = settings.firestore_collection_users
+        doc_ref = self.firestore_client.collection(collection).document(user_id)
+        doc_ref.set(preferences, merge=merge)
+        logger.info(f"Updated preferences for user {user_id}")
+
+    def save_conversation_event(
+        self, session_id: str, event_type: str, event_data: Dict[str, Any]
+    ) -> None:
+        """
+        Save conversation event to Firestore.
+
+        Args:
+            session_id: Dialogflow session ID
+            event_type: Type of event (search, recommendation, visit_scheduled, etc.)
+            event_data: Event details
+        """
+        from datetime import datetime
+
+        collection = settings.firestore_collection_sessions
+        doc_ref = self.firestore_client.collection(collection).document(session_id)
+
+        # Get existing conversation history or create new
+        doc = doc_ref.get()
+        if doc.exists:
+            conversation_data = doc.to_dict()
+        else:
+            conversation_data = {
+                "session_id": session_id,
+                "created_at": datetime.utcnow().isoformat(),
+                "events": [],
+            }
+
+        # Add new event
+        conversation_data["events"].append({
+            "type": event_type,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": event_data,
+        })
+        conversation_data["updated_at"] = datetime.utcnow().isoformat()
+
+        doc_ref.set(conversation_data)
+        logger.info(f"Saved {event_type} event for session {session_id}")
+
+    def get_conversation_history(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Get conversation history from Firestore."""
+        collection = settings.firestore_collection_sessions
+        doc_ref = self.firestore_client.collection(collection).document(session_id)
+        doc = doc_ref.get()
+
+        if doc.exists:
+            return doc.to_dict()
+        return None
+
+    async def publish_analytics_event(
+        self, event_type: str, event_data: Dict[str, Any]
+    ) -> None:
+        """
+        Publish analytics event to Pub/Sub.
+
+        Args:
+            event_type: Type of event (search, recommendation, visit_scheduled, etc.)
+            event_data: Event details
+        """
+        from datetime import datetime
+
+        topic_name = settings.pubsub_topic_prefix
+
+        message = {
+            "event_type": event_type,
+            "timestamp": datetime.utcnow().isoformat(),
+            "data": event_data,
+        }
+
+        try:
+            message_id = await self.publish_message(topic_name, message)
+            logger.info(f"Published {event_type} event with ID: {message_id}")
+        except Exception as e:
+            logger.error(f"Failed to publish analytics event: {e}")
+
+    def get_cache(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        """
+        Get cached data from Redis.
+
+        Args:
+            cache_key: Cache key
+
+        Returns:
+            Cached data or None if not found
+        """
+        if not self.redis_client:
+            return None
+
+        try:
+            cached = self.redis_client.get(cache_key)
+            if cached:
+                logger.debug(f"Cache HIT for key: {cache_key}")
+                return json.loads(cached)
+            logger.debug(f"Cache MISS for key: {cache_key}")
+            return None
+        except Exception as e:
+            logger.error(f"Redis get error: {e}")
+            return None
+
+    def set_cache(
+        self, cache_key: str, data: Dict[str, Any], ttl: Optional[int] = None
+    ) -> None:
+        """
+        Set cached data in Redis.
+
+        Args:
+            cache_key: Cache key
+            data: Data to cache
+            ttl: Time-to-live in seconds (defaults to settings.cache_ttl)
+        """
+        if not self.redis_client:
+            return
+
+        ttl = ttl or settings.cache_ttl
+
+        try:
+            self.redis_client.setex(
+                cache_key,
+                ttl,
+                json.dumps(data),
+            )
+            logger.debug(f"Cached data for key: {cache_key} (TTL: {ttl}s)")
+        except Exception as e:
+            logger.error(f"Redis set error: {e}")
+
+    def generate_cache_key(self, prefix: str, **params) -> str:
+        """
+        Generate a cache key from parameters.
+
+        Args:
+            prefix: Cache key prefix (e.g., 'pet_search', 'pet_details')
+            **params: Parameters to include in cache key
+
+        Returns:
+            Cache key string
+        """
+        # Sort params for consistent cache keys
+        sorted_params = sorted(params.items())
+        param_str = json.dumps(sorted_params, sort_keys=True)
+        param_hash = hashlib.md5(param_str.encode()).hexdigest()[:8]
+        return f"pawconnect:{prefix}:{param_hash}"
 
 
 # Singleton instances

@@ -588,6 +588,7 @@ PawConnect/
 │   ├── API.md                    # API reference & endpoints
 │   ├── ARCHITECTURE.md           # System architecture details
 │   ├── DEPLOYMENT.md             # Deployment guide (GCP)
+│   ├── GCP_INTEGRATIONS.md       # Redis, Firestore, Pub/Sub setup & usage
 │   ├── DIALOG_FLOW_COMPLETE_SETUP.md # Dialogflow CX setup guide
 │   ├── GEMINI_INTEGRATION.md     # Gemini integration guide
 │   ├── WEBHOOK_SETUP.md          # Webhook setup for Dialogflow capabilities
