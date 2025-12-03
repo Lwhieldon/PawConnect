@@ -3,7 +3,9 @@
 # "#!include" directives (which insert the entries of the given .gitignore-style
 # file at that point).
 
-# Python
+# ============================================================================
+# PYTHON BUILD ARTIFACTS
+# ============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -14,54 +16,165 @@ dist/
 build/
 *.egg
 
-# Virtual environments
+# ============================================================================
+# VIRTUAL ENVIRONMENTS
+# ============================================================================
 venv/
 env/
 ENV/
-.venv
+.venv/
+.virtualenv/
 
-# IDE
+# ============================================================================
+# ENVIRONMENT & CREDENTIALS (Use Google Secret Manager instead)
+# ============================================================================
+.env
+.env.local
+.env.*.local
+.env.example
+credentials/
+*.pem
+*.key
+*.crt
+gcp-key.json
+service-account.json
+
+# ============================================================================
+# IDE & EDITOR FILES
+# ============================================================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
+*.sublime-*
+.atom/
 
-# Git
+# ============================================================================
+# VERSION CONTROL
+# ============================================================================
 .git/
 .gitignore
+.gitattributes
+.github/
 
-# Testing
+# ============================================================================
+# TESTING & CI/CD
+# ============================================================================
+tests/
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
+pytest.ini
+.coveragerc
+coverage.xml
+*.test
+*_test.py
+test_*.py
 
-# Documentation
+# ============================================================================
+# DOCUMENTATION & GUIDES
+# ============================================================================
 docs/
+README.md
+README
+LICENSE
+LICENSE.txt
+CONTRIBUTING.md
+CHANGELOG.md
+HISTORY.md
+KAGGLE_WRITEUP.md
+*.md
+!requirements.md
 
-# Data and logs
-*.log
-data/
-logs/
-*.db
-*.sqlite
-
-# Environment variables (except .env files needed for config)
-.env.local
-.env.*.local
-
-# Notebooks
+# ============================================================================
+# NOTEBOOKS & DATA SCIENCE
+# ============================================================================
 *.ipynb
 notebooks/
+.ipynb_checkpoints/
+eval/
+experiments/
 
-# Misc
-*.bak
+# ============================================================================
+# DATA FILES (Should use Cloud Storage)
+# ============================================================================
+data/
+datasets/
+*.csv
+*.json
+*.xlsx
+*.parquet
+models/
+checkpoints/
+
+# ============================================================================
+# LOGS & TEMPORARY FILES
+# ============================================================================
+*.log
+logs/
 *.tmp
-.DS_Store
-Thumbs.db
+*.temp
+*.bak
+*.swp
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================================================
+# MEDIA FILES (Should use Cloud Storage)
+# ============================================================================
+images/
+screenshots/
+media/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.mp4
+*.avi
+
+# ============================================================================
+# DEPLOYMENT SCRIPTS (Not needed at runtime)
+# ============================================================================
+deployment/
 setup-env.bat
 setup-env.ps1
-KAGGLE_WRITEUP.md
-eval
-images/
+deploy.sh
+deploy.bat
+
+# ============================================================================
+# OPERATING SYSTEM FILES
+# ============================================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ============================================================================
+# CLAUDE CODE & AI ASSISTANTS
+# ============================================================================
+.claude/
+.cursor/
+.copilot/
+
+# ============================================================================
+# DOCKER (Keep Dockerfile, exclude everything else)
+# ============================================================================
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# ============================================================================
+# WHAT GETS UPLOADED (Everything else is included by default):
+# - pawconnect_ai/ (Python source code)
+# - Dockerfile (for Cloud Run builds)
+# - setup.py (dependencies)
+# - requirements.txt (backup dependencies)
+# ============================================================================
