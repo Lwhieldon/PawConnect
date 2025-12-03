@@ -210,6 +210,9 @@ async def dialogflow_webhook(request: Request):
         parameters = session_info.get("parameters", {})
         session_id = extract_session_id(session_info)
 
+        # Add user text to session_info for handlers that need it
+        session_info["text"] = body.get("text", "")
+
         # Track user preferences (async, non-blocking)
         await track_user_preferences(session_id, parameters)
 
@@ -528,40 +531,98 @@ async def handle_ask_pet_question(
         is_special_needs = attributes.get("isSpecialNeeds", False)
         special_needs_desc = attributes.get("specialNeedsDescription", "")
 
-        # Analyze what the user is asking about (from the original text or context)
-        # Build a conversational response based on available information
+        # Analyze what the user is asking about from the request text
+        user_text = session_info.get("text", "").lower()
         response_parts = []
 
-        # Check if qualities include leash-related info
-        has_leash_training = any(q for q in qualities if 'leash' in str(q).lower())
+        # Detect question type from user text
+        is_medical = any(word in user_text for word in ['medical', 'health', 'medication', 'medicine', 'sick', 'illness', 'condition', 'disease', 'vet', 'doctor'])
+        is_kids = any(word in user_text for word in ['kid', 'child', 'children', 'baby', 'toddler'])
+        is_cats = any(word in user_text for word in ['cat', 'feline'])
+        is_dogs = any(word in user_text for word in ['dog', 'canine', 'other dogs'])
+        is_walks = any(word in user_text for word in ['walk', 'exercise', 'active', 'run', 'outdoor', 'leash'])
+        is_personality = any(word in user_text for word in ['personality', 'temperament', 'behavior', 'friendly', 'playful', 'calm', 'energetic'])
+        is_training = any(word in user_text for word in ['train', 'housetrain', 'potty', 'bathroom'])
 
-        # For walks/exercise questions
-        if has_leash_training:
-            response_parts.append(f"Yes! {actual_pet_name} is leash trained and ready for walks.")
-        elif activity_level:
-            if 'high' in activity_level or 'active' in activity_level:
-                response_parts.append(f"Absolutely! {actual_pet_name} has a {activity_level} activity level and would love regular walks.")
-            elif 'moderate' in activity_level:
-                response_parts.append(f"Yes, {actual_pet_name} has a moderate activity level and would enjoy daily walks.")
-            elif 'low' in activity_level:
-                response_parts.append(f"{actual_pet_name} has a lower activity level, so shorter, gentler walks would be perfect.")
+        # Answer based on question type
+        if is_medical:
+            # Medical/health questions
+            if is_special_needs and special_needs_desc:
+                response_parts.append(f"{actual_pet_name} does have special needs: {special_needs_desc}")
+            elif is_special_needs:
+                response_parts.append(f"{actual_pet_name} is listed as having special needs. Please contact the shelter for specific details.")
             else:
-                response_parts.append(f"{actual_pet_name} has a {activity_level} activity level.")
+                response_parts.append(f"{actual_pet_name} does not have any listed special needs or medical issues.")
+
+        elif is_kids:
+            # Good with kids questions
+            if good_with_kids is True:
+                response_parts.append(f"Yes! {actual_pet_name} is good with kids.")
+            elif good_with_kids is False:
+                response_parts.append(f"{actual_pet_name} may not be the best fit for homes with children.")
+            else:
+                response_parts.append(f"I don't have specific information about {actual_pet_name}'s compatibility with children. Please ask the shelter!")
+
+        elif is_cats:
+            # Good with cats questions
+            if good_with_cats is True:
+                response_parts.append(f"Yes! {actual_pet_name} is good with cats.")
+            elif good_with_cats is False:
+                response_parts.append(f"{actual_pet_name} may not be compatible with cats.")
+            else:
+                response_parts.append(f"I don't have information about {actual_pet_name}'s compatibility with cats.")
+
+        elif is_dogs:
+            # Good with other dogs questions
+            if good_with_dogs is True:
+                response_parts.append(f"Yes! {actual_pet_name} is good with other dogs.")
+            elif good_with_dogs is False:
+                response_parts.append(f"{actual_pet_name} may prefer to be the only dog.")
+            else:
+                response_parts.append(f"I don't have information about {actual_pet_name}'s compatibility with other dogs.")
+
+        elif is_training:
+            # Housetraining questions
+            if is_housetrained:
+                response_parts.append(f"Yes! {actual_pet_name} is housetrained.")
+            else:
+                response_parts.append(f"I don't have information confirming {actual_pet_name} is housetrained. Please ask the shelter for details.")
+
+        elif is_walks or is_personality:
+            # Walks/exercise or personality questions
+            has_leash_training = any(q for q in qualities if 'leash' in str(q).lower())
+
+            if is_walks and has_leash_training:
+                response_parts.append(f"Yes! {actual_pet_name} is leash trained and ready for walks.")
+            elif is_walks and activity_level:
+                if 'high' in activity_level or 'active' in activity_level:
+                    response_parts.append(f"Absolutely! {actual_pet_name} has a {activity_level} activity level and would love regular walks.")
+                elif 'moderate' in activity_level:
+                    response_parts.append(f"Yes, {actual_pet_name} has a moderate activity level and would enjoy daily walks.")
+                elif 'low' in activity_level:
+                    response_parts.append(f"{actual_pet_name} has a lower activity level, so shorter, gentler walks would be perfect.")
+
+            # Add personality traits for personality questions or as supplement
+            personality_traits = [q for q in qualities if any(trait in str(q).lower() for trait in ['affectionate', 'friendly', 'playful', 'gentle', 'calm', 'energetic'])]
+            if personality_traits and (is_personality or is_walks):
+                traits_str = ', '.join(personality_traits[:3])
+                response_parts.append(f"{actual_pet_name} is described as {traits_str}.")
+
+            if is_housetrained and is_walks:
+                response_parts.append(f"{actual_pet_name} is also housetrained, which is great!")
+
         else:
-            response_parts.append(f"I don't have specific information about {actual_pet_name}'s walking preferences, but that's a great question to ask the shelter!")
-
-        # Add relevant personality traits if available
-        personality_traits = [q for q in qualities if any(trait in str(q).lower() for trait in ['affectionate', 'friendly', 'playful', 'gentle', 'calm', 'energetic'])]
-        if personality_traits:
-            traits_str = ', '.join(personality_traits[:3])  # Limit to 3 traits
-            response_parts.append(f"{actual_pet_name} is described as {traits_str}.")
-
-        # Add housetraining if relevant
-        if is_housetrained:
-            response_parts.append(f"{actual_pet_name} is also housetrained, which is great!")
+            # General question - provide overview
+            response_parts.append(f"Let me tell you about {actual_pet_name}!")
+            personality_traits = [q for q in qualities if any(trait in str(q).lower() for trait in ['affectionate', 'friendly', 'playful', 'gentle', 'calm', 'energetic'])]
+            if personality_traits:
+                traits_str = ', '.join(personality_traits[:3])
+                response_parts.append(f"{actual_pet_name} is {traits_str}.")
+            if is_housetrained:
+                response_parts.append(f"{actual_pet_name} is housetrained.")
 
         # Build final conversational response
-        response_text = " ".join(response_parts)
+        response_text = " ".join(response_parts) if response_parts else f"I don't have specific information about that for {actual_pet_name}. Please contact the shelter for more details."
         response_text += f"\n\nWant to schedule a visit to meet {actual_pet_name}?"
 
         # Track conversation event and analytics

@@ -1179,48 +1179,27 @@ class DialogflowSetup:
             logger.info("  ✓ Pet Details page created with pet_id parameter and validate-pet-id webhook")
         else:
             # Update existing page to ensure webhook route is configured
-            logger.info("  Updating Pet Details page - adding session tracking to prevent double responses...")
+            logger.info("  Updating Pet Details page - using entry_fulfillment webhook approach...")
             pet_details_page = pages_by_name["Pet Details"]
 
-            # Create a brand new Page object with all the configuration
-            # Use session parameter to track if pet details were already loaded
+            # Simplified approach: Call webhook on entry, pet_id comes from session
+            # This avoids complex form conditions that weren't working
             pet_details_page = Page(
                 name=pet_details_page.name,  # Preserve the page path
                 display_name="Pet Details",
-                form=Form(
-                    parameters=[
-                        Form.Parameter(
-                            display_name="pet_id",
-                            entity_type="projects/-/locations/-/agents/-/entityTypes/sys.any",
-                            required=True,
-                            fill_behavior=Form.Parameter.FillBehavior(
-                                initial_prompt_fulfillment=Fulfillment(
-                                    messages=[ResponseMessage(text=ResponseMessage.Text(
-                                        text=["Which pet would you like to know more about? Please provide the pet's name or ID number."]
-                                    ))]
-                                )
-                            )
-                        )
-                    ]
+                # Call webhook when entering page - pet_id should be in session parameters
+                entry_fulfillment=Fulfillment(
+                    webhook=webhook_name,
+                    tag="validate-pet-id"
+                ) if webhook_name else Fulfillment(
+                    messages=[ResponseMessage(text=ResponseMessage.Text(text=["Looking up pet details..."]))]
                 ),
-                entry_fulfillment=Fulfillment(),  # Clear to prevent double webhook calls
-                transition_routes=[
-                    TransitionRoute(
-                        # Only trigger on FINAL if we haven't already loaded details for this pet
-                        condition='$page.params.status = "FINAL" AND ($session.params.current_pet_id != $page.params.pet_id OR NOT $session.params.pet_details_loaded)',
-                        trigger_fulfillment=Fulfillment(
-                            webhook=webhook_name,
-                            tag="validate-pet-id"
-                        ) if webhook_name else Fulfillment(
-                            messages=[ResponseMessage(text=ResponseMessage.Text(text=["Looking up pet details..."]))]
-                        )
-                    )
-                ]
+                transition_routes=[]  # No form-based routes needed
             )
 
             # Update the page
             self.pages_client.update_page(page=pet_details_page)
-            logger.info("  ✓ Pet Details page updated (session tracking to prevent re-firing)")
+            logger.info("  ✓ Pet Details page updated (entry_fulfillment webhook)")
 
         # Schedule Visit page
         if "Schedule Visit" not in pages_by_name:
@@ -1463,10 +1442,19 @@ class DialogflowSetup:
                     new_routes.append(
                         TransitionRoute(
                             intent=intent_get_pet_details.name,
-                            target_page=pet_details_page.name
+                            target_page=pet_details_page.name,
+                            # Pre-fill page form parameter with intent parameter
+                            trigger_fulfillment=Fulfillment(
+                                set_parameter_actions=[
+                                    Fulfillment.SetParameterAction(
+                                        parameter="pet_id",
+                                        value="$intent.params.pet_id"
+                                    )
+                                ]
+                            )
                         )
                     )
-                    logger.info("  Added flow-level route for intent.get_pet_details -> Pet Details page")
+                    logger.info("  Added flow-level route for intent.get_pet_details -> Pet Details page (with parameter pre-fill)")
 
                 # Update flow with combined routes
                 flow.transition_routes.clear()
