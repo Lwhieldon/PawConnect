@@ -500,6 +500,64 @@ if __name__ == "__main__":
 if ADK_AVAILABLE:
     from google.adk.models import Gemini
     import os
+    from typing import Dict, List
+    from datetime import datetime, timedelta
+
+    # ============================================================================
+    # Conversation State Management - Store recent search results for follow-ups
+    # ============================================================================
+    class ConversationState:
+        """Manages conversation state to enable follow-up questions about pets."""
+
+        def __init__(self, ttl_minutes: int = 30):
+            self._searches: Dict[str, dict] = {}  # session_id -> {timestamp, pets}
+            self._ttl = timedelta(minutes=ttl_minutes)
+
+        def store_search_results(self, session_id: str, pets: List[dict]):
+            """Store search results for a session."""
+            self._searches[session_id] = {
+                'timestamp': datetime.utcnow(),
+                'pets': pets
+            }
+            logger.info(f"Stored {len(pets)} pets for session {session_id}")
+
+        def get_search_results(self, session_id: str) -> List[dict]:
+            """Get recent search results for a session."""
+            if session_id not in self._searches:
+                return []
+
+            search = self._searches[session_id]
+            # Check if results are still fresh
+            if datetime.utcnow() - search['timestamp'] > self._ttl:
+                del self._searches[session_id]
+                return []
+
+            return search['pets']
+
+        def find_pet_by_name(self, session_id: str, pet_name: str) -> dict:
+            """Find a specific pet from recent searches by name."""
+            pets = self.get_search_results(session_id)
+            pet_name_lower = pet_name.lower()
+
+            for pet in pets:
+                if pet['name'].lower() == pet_name_lower:
+                    logger.info(f"Found pet {pet_name} in cached results")
+                    return pet
+
+            return None
+
+        def cleanup_old_sessions(self):
+            """Remove expired sessions."""
+            now = datetime.utcnow()
+            expired = [
+                sid for sid, data in self._searches.items()
+                if now - data['timestamp'] > self._ttl
+            ]
+            for sid in expired:
+                del self._searches[sid]
+
+    # Global conversation state instance
+    conversation_state = ConversationState(ttl_minutes=30)
 
     # Define system instruction for the ADK agent
     SYSTEM_INSTRUCTION = """You are PawConnect AI, a helpful assistant specializing in pet adoption and fostering.
@@ -515,8 +573,37 @@ Your capabilities include:
 Key features:
 - Powered by Google Gemini for natural language understanding
 - Direct access to RescueGroups API for real-time pet availability
-- Conversational AI with context awareness
+- Conversational AI with context awareness and memory of recent searches
 - Expert knowledge about pets and adoption
+
+IMPORTANT - Context Awareness & Memory:
+After performing a search with search_pets, the results are automatically cached for 30 minutes.
+This means follow-up questions about pets from the search can be answered WITHOUT calling search_pets again.
+
+When a user asks follow-up questions about a specific pet (e.g., "Tell me more about LOGAN", "What's Apollo's temperament?", "Show me Kona's photo"):
+1. First, check if you have the pet's information from your most recent search_pets call
+2. If you have the information, answer DIRECTLY using that data - DON'T call any functions
+3. For example, if the search returned LOGAN's breed, age, description, and shelter info, just answer the question using that data
+4. Only call get_rescue_contact if:
+   - You DON'T have information about that pet from recent searches, OR
+   - The user explicitly asks for contact information or scheduling
+5. Only call search_pets again if the user is asking for a NEW search with different criteria
+
+Benefits of using context:
+- Faster responses (no API calls needed)
+- More conversational experience
+- Reduces unnecessary API usage
+- The pet data includes: name, breed, age, size, sex, description, location, shelter info, and photo link
+
+Example conversation flow:
+User: "Find dogs in 98101"
+You: [Call search_pets] "I found 5 dogs including Apollo, Lexi, Kona, LOGAN, and BLACKJACK..."
+User: "Tell me more about LOGAN"
+You: [NO function call needed] "LOGAN is a [age] [breed] who [description from search results]. He's located at [shelter] in [city, state]."
+User: "What's his temperament?"
+You: [NO function call needed] [Answer from description field in search results]
+User: "I want to schedule a visit with LOGAN"
+You: [Call schedule_visit with LOGAN's name] - the function will use cached data automatically
 
 When a user asks to find pets:
 1. If the user hasn't specified what type of pet (dog, cat, rabbit, etc.), ask them what kind of pet they're interested in
@@ -628,7 +715,8 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
         breed: str = "",
         size: str = "",
         age: str = "",
-        limit: int = 10
+        limit: int = 10,
+        session_id: str = "default"
     ) -> str:
         """
         Search for available pets from RescueGroups.org database.
@@ -745,6 +833,9 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
                     logger.error(f"Error processing pet {pet.name}: {e}")
                     continue
 
+            # Store search results in conversation state for follow-up questions
+            conversation_state.store_search_results(session_id, results)
+
             return json.dumps({
                 "success": True,
                 "message": f"Found {len(results)} {pet_type}(s) in {location or 'the database'}",
@@ -760,7 +851,7 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
                 "pets": []
             })
 
-    async def get_rescue_contact(pet_name: str, location: str = "") -> str:
+    async def get_rescue_contact(pet_name: str, location: str = "", session_id: str = "default") -> str:
         """
         Get contact information for the rescue organization caring for a specific pet.
         Use this when users ask about scheduling appointments, visiting, or contacting the rescue.
@@ -768,6 +859,7 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
         Args:
             pet_name: Name of the pet the user is interested in
             location: Optional location to help narrow down the search
+            session_id: Session ID for retrieving cached pet data
 
         Returns:
             JSON string with rescue contact information
@@ -778,7 +870,38 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
         try:
             logger.info(f"Getting rescue contact for pet: {pet_name}")
 
-            # Search for the pet to get rescue info
+            # First, check if pet is in recent search results (avoid unnecessary API call)
+            cached_pet = conversation_state.find_pet_by_name(session_id, pet_name)
+
+            if cached_pet:
+                logger.info(f"Using cached data for {pet_name}")
+                # Pet found in cache - return contact info directly
+                contact_info = {
+                    "pet_name": cached_pet['name'],
+                    "pet_breed": cached_pet.get('breed', 'Mixed Breed'),
+                    "pet_age": cached_pet.get('age', 'Unknown'),
+                    "pet_description": cached_pet.get('description', 'No description available'),
+                    "photo_link": cached_pet.get('photo_link'),
+                    "rescue_name": cached_pet.get('shelter_contact', {}).get('name', 'Unknown'),
+                    "phone": cached_pet.get('shelter_contact', {}).get('phone'),
+                    "email": cached_pet.get('shelter_contact', {}).get('email'),
+                    "website": cached_pet.get('shelter_contact', {}).get('website'),
+                    "address": cached_pet.get('shelter_contact', {}).get('address'),
+                    "city": cached_pet.get('shelter_contact', {}).get('city'),
+                    "state": cached_pet.get('shelter_contact', {}).get('state'),
+                    "zip_code": cached_pet.get('shelter_contact', {}).get('zip_code'),
+                    "full_address": f"{cached_pet.get('shelter_contact', {}).get('address', '')}, {cached_pet.get('shelter_contact', {}).get('city', '')}, {cached_pet.get('shelter_contact', {}).get('state', '')} {cached_pet.get('shelter_contact', {}).get('zip_code', '')}".strip(", ")
+                }
+
+                return json.dumps({
+                    "success": True,
+                    "message": f"Contact information for {cached_pet['name']} at {cached_pet.get('shelter_contact', {}).get('name', 'the rescue')}",
+                    "contact": contact_info,
+                    "from_cache": True
+                }, indent=2)
+
+            # Pet not in cache - need to search
+            logger.info(f"Pet {pet_name} not in cache, performing search")
             search_agent = PetSearchAgent()
             pets = await search_agent.search_pets(
                 location=location,
@@ -819,7 +942,8 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
             return json.dumps({
                 "success": True,
                 "message": f"Contact information for {pet.name} at {pet.shelter.name}",
-                "contact": contact_info
+                "contact": contact_info,
+                "from_cache": False
             }, indent=2)
 
         except Exception as e:
@@ -833,7 +957,8 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
         pet_name: str,
         location: str = "",
         preferred_date: str = "",
-        preferred_time: str = ""
+        preferred_time: str = "",
+        session_id: str = "default"
     ) -> str:
         """
         Schedule a visit to meet a pet at their rescue organization.
@@ -844,6 +969,7 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
             location: Optional location to help find the pet
             preferred_date: Preferred date for visit (e.g., "2025-12-15" or "next week")
             preferred_time: Preferred time for visit (e.g., "2:00 PM", "morning", "afternoon")
+            session_id: Session ID for retrieving cached pet data
 
         Returns:
             JSON string with visit scheduling confirmation
@@ -855,7 +981,71 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
         try:
             logger.info(f"Scheduling visit for pet: {pet_name}")
 
-            # Search for the pet to get info
+            # First, check if pet is in recent search results (avoid unnecessary API call)
+            cached_pet = conversation_state.find_pet_by_name(session_id, pet_name)
+
+            if cached_pet:
+                logger.info(f"Using cached data for {pet_name}")
+                # Pet found in cache - use cached data
+                pet_id = cached_pet['id']
+                pet_breed = cached_pet.get('breed', 'Mixed Breed')
+                shelter_name = cached_pet.get('shelter_contact', {}).get('name', 'Unknown')
+                shelter_phone = cached_pet.get('shelter_contact', {}).get('phone')
+                shelter_email = cached_pet.get('shelter_contact', {}).get('email')
+                shelter_website = cached_pet.get('shelter_contact', {}).get('website')
+                shelter_address = cached_pet.get('shelter_contact', {}).get('address', '')
+                shelter_city = cached_pet.get('shelter_contact', {}).get('city', '')
+                shelter_state = cached_pet.get('shelter_contact', {}).get('state', '')
+                shelter_zip = cached_pet.get('shelter_contact', {}).get('zip_code', '')
+                full_address = f"{shelter_address}, {shelter_city}, {shelter_state} {shelter_zip}".strip(", ")
+
+                # Parse preferred time
+                if preferred_date:
+                    try:
+                        visit_datetime = datetime.fromisoformat(preferred_date)
+                    except:
+                        visit_datetime = datetime.utcnow() + timedelta(days=1)
+                        visit_datetime = visit_datetime.replace(hour=14, minute=0, second=0, microsecond=0)
+                else:
+                    visit_datetime = datetime.utcnow() + timedelta(days=1)
+                    visit_datetime = visit_datetime.replace(hour=14, minute=0, second=0, microsecond=0)
+
+                # Create tools instance and schedule visit
+                tools = PawConnectTools()
+                user_id = "web_user"
+
+                visit_info = tools.schedule_visit(
+                    user_id=user_id,
+                    pet_id=pet_id,
+                    preferred_time=visit_datetime
+                )
+
+                return json.dumps({
+                    "success": True,
+                    "message": f"Visit request submitted for {pet_name}!",
+                    "visit": {
+                        "visit_id": visit_info["visit_id"],
+                        "pet_name": pet_name,
+                        "pet_breed": pet_breed,
+                        "scheduled_time": visit_info["scheduled_time"],
+                        "status": visit_info["status"],
+                        "rescue_name": shelter_name,
+                        "rescue_phone": shelter_phone,
+                        "rescue_email": shelter_email,
+                        "rescue_website": shelter_website,
+                        "rescue_address": full_address,
+                        "next_steps": [
+                            f"The rescue will receive your visit request for {visit_datetime.strftime('%A, %B %d at %I:%M %p')}",
+                            "They will contact you to confirm the appointment or suggest alternative times",
+                            "Please call or email them directly if you need to make changes",
+                            "Bring a valid ID and any questions you have about the adoption process"
+                        ]
+                    },
+                    "from_cache": True
+                }, indent=2)
+
+            # Pet not in cache - need to search
+            logger.info(f"Pet {pet_name} not in cache, performing search")
             search_agent = PetSearchAgent()
             pets = await search_agent.search_pets(
                 location=location,
@@ -920,7 +1110,8 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
                         "Please call or email them directly if you need to make changes",
                         "Bring a valid ID and any questions you have about the adoption process"
                     ]
-                }
+                },
+                "from_cache": False
             }, indent=2)
 
         except Exception as e:
