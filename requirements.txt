@@ -18,6 +18,7 @@ httpx>=0.25.0
 requests>=2.31.0
 
 # Google Cloud Services
+google-adk==1.18.0                  # Google ADK Framework
 google-cloud-aiplatform>=1.38.0     # Vertex AI / Gemini for conversation agent
 google-cloud-dialogflow-cx>=1.20.0  # Dialogflow CX automation & webhook
 google-cloud-vision>=3.5.0          # Vision API for pet image analysis
