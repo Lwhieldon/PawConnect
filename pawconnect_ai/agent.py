@@ -17,6 +17,7 @@ from .utils.validators import validate_user_input
 
 # Import ADK for web interface support
 try:
+    from google.adk.apps import App
     from google.adk.agents import Agent, LlmAgent
     from google.genai.types import Content, Part
     ADK_AVAILABLE = True
@@ -587,7 +588,13 @@ When a user asks follow-up questions about a specific pet (e.g., "Tell me more a
 4. Only call get_rescue_contact if:
    - You DON'T have information about that pet from recent searches, OR
    - The user explicitly asks for contact information or scheduling
-5. Only call search_pets again if the user is asking for a NEW search with different criteria
+5. Only call search_pets again if the user is asking for a **NEW search with DIFFERENT criteria**:
+   - Different pet type (dogs → cats)
+   - Different size (any dogs → small dogs)
+   - Different age (any dogs → puppies)
+   - Different breed (any dogs → Golden Retrievers)
+   - Different location (98101 → 98102)
+   - User explicitly asks to "search again" or "find different pets"
 
 Benefits of using context:
 - Faster responses (no API calls needed)
@@ -595,9 +602,11 @@ Benefits of using context:
 - Reduces unnecessary API usage
 - The pet data includes: name, breed, age, size, sex, description, location, shelter info, and photo link
 
-Example conversation flow:
+Example conversation flows:
+
+**Example 1: Follow-up questions about a specific pet**
 User: "Find dogs in 98101"
-You: [Call search_pets] "I found 5 dogs including Apollo, Lexi, Kona, LOGAN, and BLACKJACK..."
+You: [Call search_pets(pet_type="dog", location="98101")] "I found 10 dogs including Apollo, Lexi, Kona, LOGAN, and BLACKJACK..."
 User: "Tell me more about LOGAN"
 You: [NO function call needed] "LOGAN is a [age] [breed] who [description from search results]. He's located at [shelter] in [city, state]."
 User: "What's his temperament?"
@@ -605,10 +614,41 @@ You: [NO function call needed] [Answer from description field in search results]
 User: "I want to schedule a visit with LOGAN"
 You: [Call schedule_visit with LOGAN's name] - the function will use cached data automatically
 
+**Example 2: New search with different size criteria**
+User: "Find dogs in 98101"
+You: [Call search_pets(pet_type="dog", location="98101")] "I found 10 dogs..."
+User: "Tell me about LOGAN"
+You: [NO function call] "LOGAN is a large German Shepherd..."
+User: "I want to schedule a visit"
+You: [Call schedule_visit("LOGAN")] "Great! Visit scheduled..."
+User: "Actually, show me small dogs instead"
+You: [Call search_pets(pet_type="dog", size="small", location="98101")] "I found 5 small dogs..."
+NOTE: This is a NEW search with DIFFERENT criteria (size filter added), so you MUST call search_pets again!
+
 When a user asks to find pets:
 1. If the user hasn't specified what type of pet (dog, cat, rabbit, etc.), ask them what kind of pet they're interested in
 2. Use the search_pets function to query RescueGroups with the specified pet_type and location
-3. IMPORTANT - Location filtering LIMITATION:
+3. **IMPORTANT - Use ALL available search filters when specified by the user:**
+   - **Size filter**: If user mentions "small", "medium", "large", or "extra-large", pass the `size` parameter
+     - Examples: "small dogs" → size="small", "large cats" → size="large"
+   - **Age filter**: If user mentions age, pass the `age` parameter
+     - "puppies" → age="baby", "young dogs" → age="young", "senior dogs" → age="senior", "adult dogs" → age="adult"
+   - **Breed filter**: If user mentions a specific breed, pass the `breed` parameter
+     - "Golden Retrievers" → breed="Golden Retriever"
+   - **Always include location** if the user provided it in this or a previous message
+
+   **Examples of proper filter usage:**
+   - User: "Show me small dogs in 98101" → search_pets(pet_type="dog", size="small", location="98101")
+   - User: "Find puppies near me" → search_pets(pet_type="dog", age="baby", location="[their location]")
+   - User: "I want a large Golden Retriever" → search_pets(pet_type="dog", breed="Golden Retriever", size="large", location="[their location]")
+   - User: "Show me senior cats" → search_pets(pet_type="cat", age="senior", location="[their location]")
+
+   **IMPORTANT - Remember location across searches:**
+   - Once a user provides a location (like "98101"), remember it for subsequent searches in the same conversation
+   - Example: User says "Find dogs in 98101", then later says "Now show me small dogs" → use location="98101" for the second search too
+   - Only omit location if the user explicitly asks to search without location restrictions
+
+4. IMPORTANT - Location filtering LIMITATION:
    - The RescueGroups public API may not filter results by location reliably
    - Even when a ZIP code is provided (e.g., "98101"), results may include pets from ALL locations nationwide
    - ALWAYS check the "location" field for each pet and INFORM the user that results may include pets from outside their search area
@@ -721,23 +761,40 @@ Be friendly, empathetic, and guide users through the pet adoption journey with r
         """
         Search for available pets from RescueGroups.org database.
 
+        IMPORTANT: Use the filter parameters (size, age, breed) when the user specifies them!
+        - If user says "small dogs", pass size="small"
+        - If user says "puppies", pass age="baby"
+        - If user says "Golden Retrievers", pass breed="Golden Retriever"
+
         IMPORTANT LIMITATION: The RescueGroups public API may not filter by location reliably.
         Results may include pets from all locations regardless of ZIP code provided.
         Always check each pet's "location" field and inform users about pets from outside their area.
 
         Args:
             pet_type: Type of pet to search for (dog, cat, rabbit, etc.). If not specified, searches all types.
+                     REQUIRED when user specifies a pet type.
             location: Location to search. Provide ZIP code (e.g., "98101") but be aware results may include
                      pets from anywhere in the country due to API limitations.
             distance: Search radius in miles from the location (default 50, max 500). May not be honored by API.
-            breed: Specific breed to search for (optional)
-            size: Size of pet (small, medium, large, extra-large) (optional)
-            age: Age group (baby, young, adult, senior) (optional)
+            breed: Specific breed to search for. USE THIS when user mentions a breed!
+                  Examples: "Golden Retriever", "Labrador Retriever", "Siamese"
+            size: Size of pet. USE THIS when user mentions size!
+                 Valid values: "small", "medium", "large", "extra-large"
+                 Examples: "small dogs" → size="small", "large cats" → size="large"
+            age: Age group. USE THIS when user mentions age!
+                Valid values: "baby", "young", "adult", "senior"
+                Examples: "puppies" → age="baby", "senior dogs" → age="senior"
             limit: Maximum number of results to return (default 10, max 100)
+            session_id: Session identifier for caching results (automatically provided by ADK)
 
         Returns:
             JSON string containing list of available pets with details. Each pet includes a "location" field
             showing where the pet is actually located.
+
+        Examples:
+            - User: "Find small dogs in 98101" → search_pets(pet_type="dog", size="small", location="98101")
+            - User: "Show me puppies" → search_pets(pet_type="dog", age="baby", location="[user's location]")
+            - User: "Large Golden Retrievers" → search_pets(pet_type="dog", breed="Golden Retriever", size="large", location="[user's location]")
         """
         import json
         from .sub_agents.pet_search_agent import PetSearchAgent
@@ -1191,3 +1248,11 @@ else:
 
     root_agent = DummyAgent()
     logger.warning("ADK not available - created dummy root_agent")
+
+# Create the App object for ADK integration
+if ADK_AVAILABLE:
+    app = App(name="pawconnect_ai", root_agent=root_agent)
+    logger.info("ADK App created successfully")
+else:
+    app = None
+    logger.warning("ADK not available - app is None")
