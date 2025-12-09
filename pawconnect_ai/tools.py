@@ -5,7 +5,7 @@ Provides specialized functions for pet search, matching, and workflow operations
 
 import asyncio
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from loguru import logger
 
 from .sub_agents.pet_search_agent import PetSearchAgent
@@ -14,6 +14,9 @@ from .sub_agents.vision_agent import VisionAgent
 from .sub_agents.workflow_agent import WorkflowAgent
 from .schemas.pet_data import Pet, PetMatch
 from .schemas.user_profile import UserProfile
+from .utils.mcp_email_client import get_email_client
+from .utils.mcp_calendar_client import get_calendar_client
+from .config import settings
 
 
 class PawConnectTools:
@@ -155,36 +158,113 @@ class PawConnectTools:
             logger.error(f"Error analyzing pet image: {e}")
             return {}
 
-    def schedule_visit(
+    async def schedule_visit(
         self,
         user_id: str,
         pet_id: str,
-        preferred_time: datetime
+        preferred_time: datetime,
+        user_name: Optional[str] = None,
+        user_email: Optional[str] = None,
+        duration_minutes: int = 45,
     ) -> Dict[str, Any]:
         """
-        Schedule a shelter visit to meet a pet.
+        Schedule a shelter visit to meet a pet with MCP-powered email and calendar integration.
 
         Args:
             user_id: User identifier
             pet_id: Pet identifier
             preferred_time: Preferred visit time
+            user_name: User's name (optional, will fetch from DB if not provided)
+            user_email: User's email (optional, will fetch from DB if not provided)
+            duration_minutes: Visit duration in minutes (default: 45)
 
         Returns:
-            Dictionary with visit confirmation details
+            Dictionary with visit confirmation details including calendar event and email status
         """
         try:
             visit_id = f"visit_{user_id}_{pet_id}_{int(datetime.utcnow().timestamp())}"
 
+            # Fetch pet details
+            pet = await self.search_agent.get_pet_by_id(pet_id)
+            if not pet:
+                raise ValueError(f"Pet not found: {pet_id}")
+
+            # If user info not provided, fetch from database (placeholder for now)
+            # TODO: Integrate with Firestore to fetch user profile
+            if not user_name:
+                user_name = "Valued User"  # Placeholder
+            if not user_email:
+                user_email = "user@example.com"  # Placeholder
+
+            # Extract shelter information
+            shelter_name = pet.shelter.name if pet.shelter else "Local Shelter"
+            shelter_address = (
+                f"{pet.shelter.city}, {pet.shelter.state} {pet.shelter.zip_code}"
+                if pet.shelter
+                else "Contact shelter for address"
+            )
+
             visit_info = {
                 "visit_id": visit_id,
                 "user_id": user_id,
+                "user_name": user_name,
+                "user_email": user_email,
                 "pet_id": pet_id,
+                "pet_name": pet.name,
                 "scheduled_time": preferred_time.isoformat(),
+                "duration_minutes": duration_minutes,
+                "shelter_name": shelter_name,
+                "shelter_address": shelter_address,
                 "status": "scheduled",
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.utcnow().isoformat(),
+                "calendar_event_id": None,
+                "email_sent": False,
             }
 
-            logger.info(f"Visit scheduled: {visit_id}")
+            # Create calendar event if enabled
+            if settings.mcp_calendar_enabled:
+                try:
+                    calendar_client = get_calendar_client()
+                    calendar_result = await calendar_client.create_visit_event(
+                        user_name=user_name,
+                        user_email=user_email,
+                        pet_name=pet.name,
+                        pet_id=pet_id,
+                        visit_datetime=preferred_time,
+                        duration_minutes=duration_minutes,
+                        shelter_name=shelter_name,
+                        shelter_address=shelter_address,
+                        visit_id=visit_id,
+                    )
+                    visit_info["calendar_event_id"] = calendar_result.get("event_id")
+                    visit_info["calendar_link"] = calendar_result.get("html_link") or calendar_result.get("web_link")
+                    logger.info(f"Calendar event created: {calendar_result.get('event_id')}")
+                except Exception as e:
+                    logger.warning(f"Failed to create calendar event: {e}")
+                    visit_info["calendar_error"] = str(e)
+
+            # Send confirmation email if enabled
+            if settings.mcp_email_enabled and settings.email_notify_visit_scheduled:
+                try:
+                    email_client = get_email_client()
+                    email_result = await email_client.send_visit_confirmation(
+                        to_email=user_email,
+                        user_name=user_name,
+                        pet_name=pet.name,
+                        pet_id=pet_id,
+                        visit_datetime=preferred_time,
+                        shelter_name=shelter_name,
+                        shelter_address=shelter_address,
+                        visit_id=visit_id,
+                    )
+                    visit_info["email_sent"] = email_result.get("status") == "success"
+                    visit_info["email_message_id"] = email_result.get("message_id")
+                    logger.info(f"Confirmation email sent: {email_result.get('message_id')}")
+                except Exception as e:
+                    logger.warning(f"Failed to send confirmation email: {e}")
+                    visit_info["email_error"] = str(e)
+
+            logger.info(f"Visit scheduled successfully: {visit_id}")
             return visit_info
 
         except Exception as e:

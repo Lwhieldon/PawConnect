@@ -131,6 +131,57 @@ class Settings(BaseSettings):
     testing_mode: bool = Field(default=False, description="Enable testing mode")
     mock_apis: bool = Field(default=False, description="Use mock API responses")
 
+    # MCP Servers - Email & Calendar
+    mcp_email_provider: str = Field(default="gmail", description="Email provider: gmail, outlook, sendgrid")
+    mcp_calendar_provider: str = Field(default="google-calendar", description="Calendar provider: google-calendar, outlook")
+    mcp_email_enabled: bool = Field(default=True, description="Enable MCP email functionality")
+    mcp_calendar_enabled: bool = Field(default=True, description="Enable MCP calendar functionality")
+
+    # Gmail MCP
+    gmail_client_id: Optional[str] = Field(default=None, description="Gmail OAuth client ID")
+    gmail_client_secret: Optional[str] = Field(default=None, description="Gmail OAuth client secret")
+    gmail_redirect_uri: str = Field(default="http://localhost:8080/oauth/callback", description="Gmail OAuth redirect URI")
+    gmail_refresh_token: Optional[str] = Field(default=None, description="Gmail OAuth refresh token")
+    gmail_from_email: str = Field(default="noreply@pawconnect.org", description="Gmail sender email")
+    gmail_from_name: str = Field(default="PawConnect Team", description="Gmail sender name")
+
+    # Google Calendar MCP
+    google_calendar_client_id: Optional[str] = Field(default=None, description="Google Calendar OAuth client ID")
+    google_calendar_client_secret: Optional[str] = Field(default=None, description="Google Calendar OAuth client secret")
+    google_calendar_redirect_uri: str = Field(default="http://localhost:8080/oauth/callback", description="Google Calendar OAuth redirect URI")
+    google_calendar_refresh_token: Optional[str] = Field(default=None, description="Google Calendar OAuth refresh token")
+    google_calendar_id: str = Field(default="primary", description="Google Calendar ID for shelter visits")
+
+    # Outlook MCP
+    outlook_client_id: Optional[str] = Field(default=None, description="Outlook/Microsoft365 OAuth client ID")
+    outlook_client_secret: Optional[str] = Field(default=None, description="Outlook OAuth client secret")
+    outlook_redirect_uri: str = Field(default="http://localhost:8080/oauth/callback", description="Outlook OAuth redirect URI")
+    outlook_refresh_token: Optional[str] = Field(default=None, description="Outlook OAuth refresh token")
+    outlook_tenant_id: str = Field(default="common", description="Microsoft tenant ID")
+
+    # SendGrid MCP
+    sendgrid_api_key: Optional[str] = Field(default=None, description="SendGrid API key")
+    sendgrid_from_email: str = Field(default="noreply@pawconnect.org", description="SendGrid sender email")
+    sendgrid_from_name: str = Field(default="PawConnect Team", description="SendGrid sender name")
+
+    # Email Templates & Notifications
+    email_visit_confirmation_subject: str = Field(
+        default="Your Visit to Meet {pet_name} is Confirmed!",
+        description="Subject for visit confirmation emails"
+    )
+    email_application_received_subject: str = Field(
+        default="We Received Your {application_type} Application",
+        description="Subject for application received emails"
+    )
+    email_application_status_subject: str = Field(
+        default="Update on Your Application for {pet_name}",
+        description="Subject for application status emails"
+    )
+    email_notify_visit_scheduled: bool = Field(default=True, description="Send email when visit is scheduled")
+    email_notify_application_status: bool = Field(default=True, description="Send email on application status changes")
+    email_notify_foster_adopter_match: bool = Field(default=True, description="Send email when foster/adopter match occurs")
+    email_rate_limit: int = Field(default=100, description="Email rate limit per hour")
+
     def get_pubsub_topic(self, topic_name: str) -> str:
         """Get fully qualified Pub/Sub topic name."""
         return f"projects/{self.gcp_project_id}/topics/{topic_name}"

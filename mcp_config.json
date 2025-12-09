@@ -1,0 +1,95 @@
+{
+  "mcpServers": {
+    "gmail": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-gmail"
+      ],
+      "env": {
+        "GMAIL_CLIENT_ID": "${GMAIL_CLIENT_ID}",
+        "GMAIL_CLIENT_SECRET": "${GMAIL_CLIENT_SECRET}",
+        "GMAIL_REDIRECT_URI": "${GMAIL_REDIRECT_URI}",
+        "GMAIL_REFRESH_TOKEN": "${GMAIL_REFRESH_TOKEN}"
+      },
+      "description": "Gmail MCP server for sending emails to adopters/fosters",
+      "capabilities": ["send_email", "read_email", "draft_email"]
+    },
+    "google-calendar": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-google-calendar"
+      ],
+      "env": {
+        "GOOGLE_CALENDAR_CLIENT_ID": "${GOOGLE_CALENDAR_CLIENT_ID}",
+        "GOOGLE_CALENDAR_CLIENT_SECRET": "${GOOGLE_CALENDAR_CLIENT_SECRET}",
+        "GOOGLE_CALENDAR_REDIRECT_URI": "${GOOGLE_CALENDAR_REDIRECT_URI}",
+        "GOOGLE_CALENDAR_REFRESH_TOKEN": "${GOOGLE_CALENDAR_REFRESH_TOKEN}"
+      },
+      "description": "Google Calendar MCP server for scheduling shelter visits",
+      "capabilities": ["create_event", "list_events", "update_event", "delete_event"]
+    },
+    "outlook": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-outlook"
+      ],
+      "env": {
+        "OUTLOOK_CLIENT_ID": "${OUTLOOK_CLIENT_ID}",
+        "OUTLOOK_CLIENT_SECRET": "${OUTLOOK_CLIENT_SECRET}",
+        "OUTLOOK_REDIRECT_URI": "${OUTLOOK_REDIRECT_URI}",
+        "OUTLOOK_REFRESH_TOKEN": "${OUTLOOK_REFRESH_TOKEN}"
+      },
+      "description": "Microsoft Outlook MCP server for email and calendar (alternative to Gmail/Google Calendar)",
+      "capabilities": ["send_email", "create_calendar_event", "read_email"]
+    },
+    "sendgrid": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sendgrid"
+      ],
+      "env": {
+        "SENDGRID_API_KEY": "${SENDGRID_API_KEY}",
+        "SENDGRID_FROM_EMAIL": "${SENDGRID_FROM_EMAIL}",
+        "SENDGRID_FROM_NAME": "${SENDGRID_FROM_NAME}"
+      },
+      "description": "SendGrid MCP server for transactional emails (production-ready alternative)",
+      "capabilities": ["send_email", "send_template_email"]
+    }
+  },
+  "settings": {
+    "defaultEmailProvider": "gmail",
+    "defaultCalendarProvider": "google-calendar",
+    "fallbackEmailProvider": "sendgrid",
+    "enableEmailNotifications": true,
+    "enableCalendarSync": true
+  },
+  "features": {
+    "visitScheduling": {
+      "enabled": true,
+      "requiresCalendarSync": true,
+      "requiresEmailConfirmation": true,
+      "autoAddAttendees": true
+    },
+    "applicationStatus": {
+      "enabled": true,
+      "sendEmailUpdates": true,
+      "emailTriggers": [
+        "submitted",
+        "under_review",
+        "background_check_complete",
+        "home_assessment_scheduled",
+        "approved",
+        "rejected"
+      ]
+    },
+    "fosterAdopterMatching": {
+      "enabled": true,
+      "notifyFosterOnAdopterInterest": true,
+      "notifyAdopterOnFosterAvailability": true
+    }
+  }
+}

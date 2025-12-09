@@ -28,7 +28,7 @@ PawConnect AI addresses these challenges through an intelligent multi-agent syst
 
 - **Personalizes Discovery**: Uses machine learning to match pets with users based on lifestyle compatibility, personality profiles, and historical preferences, not just basic filters in common pet adoption websites.
 
-- **Streamlines Communication**: Provides 24/7 conversational assistance through Dialogflow CX, answering questions about breeds, care requirements, adoption processes, and scheduling of follow up meetings & conversations with shelter staff.
+- **Streamlines Communication**: Provides 24/7 conversational assistance through Dialogflow CX, answering questions about breeds, care requirements, adoption processes, and scheduling of follow up meetings & conversations with shelter staff. **NEW**: MCP-powered email and calendar integration automatically sends visit confirmations, application status updates, and coordinates foster-adopter connections.
 
 - **Enhances Decision-Making**: Leverages Google Cloud Vision API to analyze pet photos for breed identification, age estimation, and behavioral cues, providing deeper insights beyond text descriptions.
 
@@ -116,6 +116,14 @@ PawConnect AI is built around a central orchestrator, the **`pawconnect_main_age
 │  │              │  │              │  │              │  │              │     │
 │  │ Event Queue  │  │ Cache Layer  │  │ Model Store  │  │ API Keys     │     │
 │  │ Async Comm.  │  │ Session Data │  │ Images       │  │ Credentials  │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
+│                                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │ MCP Email    │  │ MCP Calendar │  │ Gmail/       │  │ Google       │     │
+│  │ Servers      │  │ Servers      │  │ Outlook/     │  │ Calendar/    │     │
+│  │              │  │              │  │ SendGrid     │  │ Outlook Cal  │     │
+│  │ Multi-       │  │ Event        │  │ Integration  │  │ Integration  │     │
+│  │ Provider     │  │ Management   │  │              │  │              │     │
 │  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
 
@@ -289,10 +297,15 @@ The agent system leverages custom tools and Google Cloud services:
    - Implements ensemble voting for breed identification
    - Generates natural language descriptions from visual features
 
-4. **`schedule_visit`**: Calendar integration tool
-   - Syncs with shelter Google Calendars via Calendar API
-   - Sends confirmation emails and SMS reminders
+4. **`schedule_visit`**: **NEW - MCP-powered** Calendar & Email integration tool
+   - Multi-provider support: Gmail, Outlook/Microsoft 365, SendGrid for emails
+   - Multi-provider support: Google Calendar, Outlook Calendar for scheduling
+   - Automatically sends HTML confirmation emails with shelter details and visit information
+   - Creates calendar events with automatic attendee invitations and reminders (24hr and 1hr before)
+   - OAuth 2.0 secured connections to email and calendar providers
+   - Fallback mechanisms: switches to SendGrid if primary email provider fails
    - Handles rescheduling and cancellation logic
+   - Graceful degradation: continues operation even if email/calendar services are unavailable
 
 5. **`process_application`**: Orchestrates multi-step application workflow
    - Validates form completeness and data quality
@@ -324,7 +337,11 @@ PawConnect AI follows a ten-step intelligent matching process:
 
 7. **Visual Exploration**: Users can upload their own pet photos (existing pets at home) for Vision Agent to analyze compatibility (e.g., size matching, energy levels).
 
-8. **Visit Scheduling**: When user expresses interest, Workflow Agent coordinates meet-and-greet scheduling, checking shelter calendar availability and sending confirmations.
+8. **Visit Scheduling**: When user expresses interest, Workflow Agent coordinates meet-and-greet scheduling via **MCP-powered email and calendar integration**. System automatically:
+   - Creates calendar event on shelter's calendar with visit details
+   - Sends HTML confirmation email to adopter with shelter address and what to bring
+   - Adds calendar invite to adopter's calendar with automatic reminders
+   - Handles rescheduling requests and cancellations bidirectionally
 
 9. **Application Processing**: After successful visit, Workflow Agent guides user through digital application, handling validation, background checks, and home assessment scheduling asynchronously.
 
@@ -551,6 +568,7 @@ PawConnect/
 │   └── integration/               # Integration tests
 │       ├── __init__.py
 │       └── test_api_integration.py
+│   │   └── test_mcp_integrations.py
 │
 ├── eval/                          # Model evaluation
 │   ├── evaluate_recommendations.py # Evaluation script (Precision@K, NDCG)
@@ -593,8 +611,6 @@ PawConnect/
 │   ├── GEMINI_INTEGRATION.md     # Gemini integration guide
 │   ├── WEBHOOK_SETUP.md          # Webhook setup for Dialogflow capabilities
 │   └── SECRETS_MANAGEMENT.md     # Secrets management guide
-
-
 │
 ├── images/                        # Project images & assets
 │   └── PawConnectAI-Logo.png     # Application logo
