@@ -28,7 +28,7 @@ PawConnect AI addresses these challenges through an intelligent multi-agent syst
 
 - **Personalizes Discovery**: Uses machine learning to match pets with users based on lifestyle compatibility, personality profiles, and historical preferences, not just basic filters in common pet adoption websites.
 
-- **Streamlines Communication**: Provides 24/7 conversational assistance through Dialogflow CX, answering questions about breeds, care requirements, adoption processes, and scheduling of follow up meetings & conversations with shelter staff. **NEW**: MCP-powered email and calendar integration automatically sends visit confirmations, application status updates, and coordinates foster-adopter connections.
+- **Streamlines Communication**: Provides 24/7 conversational assistance through Dialogflow CX, answering questions about breeds, care requirements, adoption processes, and scheduling of follow up meetings & conversations with shelter staff. MCP-powered email and calendar integration automatically sends visit confirmations, application status updates, and coordinates foster-adopter connections.
 
 - **Enhances Decision-Making**: Leverages Google Cloud Vision API to analyze pet photos for breed identification, age estimation, and behavioral cues, providing deeper insights beyond text descriptions.
 
@@ -297,7 +297,7 @@ The agent system leverages custom tools and Google Cloud services:
    - Implements ensemble voting for breed identification
    - Generates natural language descriptions from visual features
 
-4. **`schedule_visit`**: **NEW - MCP-powered** Calendar & Email integration tool
+4. **`schedule_visit`**: MCP-powered Calendar & Email integration tool
    - Multi-provider support: Gmail, Outlook/Microsoft 365, SendGrid for emails
    - Multi-provider support: Google Calendar, Outlook Calendar for scheduling
    - Automatically sends HTML confirmation emails with shelter details and visit information
@@ -508,11 +508,21 @@ python -m pawconnect_ai.agent \
 Run the comprehensive test suite:
 
 ```bash
+# All tests
+python -m pytest tests/ -v
+
 # Unit tests
-python -m pytest tests/unit/
+python -m pytest tests/unit/ -v
 
 # Integration tests (requires API keys)
-python -m pytest tests/integration/
+python -m pytest tests/integration/ -v
+
+# MCP Email & Calendar integration tests
+python -m pytest tests/integration/test_mcp_integrations.py -v
+
+# Specific MCP test classes
+python -m pytest tests/integration/test_mcp_integrations.py::TestMCPEmailClient -v
+python -m pytest tests/integration/test_mcp_integrations.py::TestMCPCalendarClient -v
 
 # End-to-end tests
 python -m tests.test_agent
@@ -520,6 +530,16 @@ python -m tests.test_agent
 # Coverage report
 pytest --cov=pawconnect_ai --cov-report=html
 ```
+
+**Test Results**: The MCP integration test suite includes 23 tests covering:
+- Email client initialization and provider configuration
+- Email sending in mock and production modes
+- Visit confirmation emails with HTML templates
+- Application status update emails
+- Calendar event creation, updates, and deletion
+- Visit scheduling end-to-end workflow
+- Provider fallback mechanisms
+- Error handling and graceful degradation
 
 ## Project Structure
 
@@ -548,7 +568,9 @@ PawConnect/
 │   │   ├── __init__.py
 │   │   ├── api_clients.py        # RescueGroups & GCP API clients
 │   │   ├── validators.py         # Input validation
-│   │   └── helpers.py            # Helper functions & parsers
+│   │   ├── helpers.py            # Helper functions & parsers
+│   │   ├── mcp_email_client.py   # MCP Email client wrapper
+│   │   └── mcp_calendar_client.py # MCP Calendar client wrapper
 │   │
 │   └── schemas/                   # Pydantic data models
 │       ├── __init__.py
@@ -567,8 +589,8 @@ PawConnect/
 │   │
 │   └── integration/               # Integration tests
 │       ├── __init__.py
-│       └── test_api_integration.py
-│   │   └── test_mcp_integrations.py
+│       ├── test_api_integration.py
+│       └── test_mcp_integrations.py # MCP Email & Calendar tests
 │
 ├── eval/                          # Model evaluation
 │   ├── evaluate_recommendations.py # Evaluation script (Precision@K, NDCG)
@@ -610,12 +632,14 @@ PawConnect/
 │   ├── DIALOG_FLOW_COMPLETE_SETUP.md # Dialogflow CX setup guide
 │   ├── GEMINI_INTEGRATION.md     # Gemini integration guide
 │   ├── WEBHOOK_SETUP.md          # Webhook setup for Dialogflow capabilities
-│   └── SECRETS_MANAGEMENT.md     # Secrets management guide
+│   ├── SECRETS_MANAGEMENT.md     # Secrets management guide
+│   └── MCP_SETUP_GUIDE.md        # MCP Email & Calendar setup guide
 │
 ├── images/                        # Project images & assets
 │   └── PawConnectAI-Logo.png     # Application logo
 │   └── SadieGrace.jpg     # Sadie Grace Memorial Photo
 │
+├── mcp_config.json                # MCP server configuration (Email & Calendar)
 ├── .env.example                   # Environment variables template
 ├── requirements.txt               # Python dependencies
 ├── setup.py                       # Package setup configuration
@@ -666,17 +690,32 @@ In practice, PawConnect AI has the potential to:
 - Digital application pre-filled with conversation data
 - **Time to first visit**: 2-4 hours
 
+### Recent Enhancements
+
+**December 2025: Visit Scheduling & Email/Calendar Integration **: Full MCP-powered implementation with:
+   - **Multi-Provider Email Support**: Gmail, Outlook/Microsoft 365, and SendGrid integration with OAuth 2.0
+   - **Multi-Provider Calendar Support**: Google Calendar and Outlook Calendar integration
+   - **Automated Confirmations**: HTML email confirmations sent automatically with shelter details, what to bring, and visit information
+   - **Calendar Events**: Automatic calendar invites with shelter location, attendees, and reminders (24hr and 1hr before)
+   - **Fallback Mechanisms**: Automatic fallback to SendGrid if primary email provider fails
+   - **Graceful Degradation**: System continues operation even if email/calendar services are temporarily unavailable
+   - **Comprehensive Testing**: 23+ unit and integration tests validating all functionality
+
+**December 2025: MCP Integration Foundation (Completed)**: Model Context Protocol servers for Email & Calendar:
+   - Configuration file (`mcp_config.json`) supporting multiple providers
+   - Unified client wrappers for easy provider switching
+   - Comprehensive setup documentation with OAuth flow guides
+   - Environment-based configuration for development and production
+
 ### Future Enhancements
 
 With additional development time, the system could incorporate:
 
-1. **Visit Scheduling & Rescue Notifications**: Enhance the current placeholder `schedule_visit` implementation with:
-   - **Email Notification Service**: Integrate SendGrid, Mailgun, or SMTP to automatically notify rescues when users request visits
-   - **Database Persistence**: Save visit requests to Firestore with status tracking (pending → confirmed → completed)
-   - **Rescue Portal/Dashboard**: Web interface where rescue organizations can view, manage, and confirm visit requests
-   - **Calendar Integration**: Sync with shelter Google Calendars to show available time slots and prevent double-booking
-   - **Bidirectional Notifications**: Email/SMS users when rescues confirm appointments, with reminders before visits
-   - **Rescheduling Workflow**: Allow both users and rescues to propose alternative times through the system
+1. **Rescue Portal/Dashboard**: Web interface where rescue organizations can view, manage, and confirm visit requests with:
+   - **Visit Request Management**: Real-time dashboard showing pending, confirmed, and completed visits
+   - **Database Persistence**: Enhanced Firestore integration for visit status tracking (pending → confirmed → completed)
+   - **Shelter Calendar Availability**: Show available time slots to prevent double-booking
+   - **Bidirectional Rescheduling**: Allow both users and rescues to propose alternative times through the system
 
 2. **Predictive Health Analytics**: Partner with veterinary AI platforms to predict future health costs and care needs based on breed, age, and medical history, helping users make informed financial decisions.
 
@@ -688,7 +727,12 @@ With additional development time, the system could incorporate:
 
 6. **Multi-Pet Household Matching**: Extend Vision Agent to analyze multiple pets together, assessing pack dynamics and recommending compatible additions.
 
-7. **Community Integration via MCP**: Integrate Model Context Protocol servers to connect with foster/adopter forums, veterinary knowledge bases, and training resources, providing comprehensive ecosystem support.
+7. **Extended MCP Integration**: Add additional Model Context Protocol servers for:
+   - **Foster/Adopter Forums**: Connect with community discussion platforms for peer support
+   - **Veterinary Knowledge Bases**: Access to breed-specific care guidelines and medical information
+   - **Training Resources**: Integration with pet training platforms and behavior experts
+   - **Slack MCP Server**: Create dedicated channels for foster community coordination and adopter support
+   - **Google Drive MCP Server**: Share pet medical records, adoption agreements, and training materials between fosters and adopters
 
 ## Key Technologies
 
@@ -705,6 +749,22 @@ With additional development time, the system could incorporate:
 - **Cloud Storage**: Pet image storage and model artifacts
 - **Cloud Workflows**: Application process orchestration
 - **Google Maps API**: Location-based shelter search
+
+### MCP (Model Context Protocol) Integration
+- **Email MCP Servers**: Multi-provider email support for automated communications
+  - **Gmail MCP**: OAuth 2.0 authenticated email sending via Gmail API
+  - **Outlook/Microsoft 365 MCP**: Enterprise email through Microsoft Graph API
+  - **SendGrid MCP**: Production-grade transactional email service (fallback provider)
+- **Calendar MCP Servers**: Multi-provider calendar integration for visit scheduling
+  - **Google Calendar MCP**: OAuth 2.0 authenticated calendar event management
+  - **Outlook Calendar MCP**: Microsoft 365 calendar integration via Graph API
+- **MCP Features**:
+  - Unified client wrappers for provider abstraction
+  - Automatic provider fallback for reliability
+  - HTML email templates with shelter details and visit information
+  - Calendar events with automatic reminders and attendee invitations
+  - OAuth 2.0 security with refresh token management
+  - Environment-based configuration for dev/prod deployments
 
 ### ML & AI Frameworks
 - **TensorFlow/Keras**: Recommendation model architecture
@@ -823,4 +883,4 @@ Apache-2.0
 
 **Date**: November 2025
 
-**Contact**: [[\Email\]](lwhieldon1@gmail.com) | [\[GitHub Profile\]](https://github.com/Lwhieldon)  | [\[Kaggle Profile\]](https://www.kaggle.com/leewhieldon)
+**Contact**: [[Email\]](lwhieldon1@gmail.com) | [\[GitHub Profile\]](https://github.com/Lwhieldon)  | [\[Kaggle Profile\]](https://www.kaggle.com/leewhieldon)
