@@ -692,7 +692,7 @@ In practice, PawConnect AI has the potential to:
 
 ### Recent Enhancements
 
-**December 2025: Visit Scheduling & Email/Calendar Integration **: Full MCP-powered implementation with:
+**December 2025: Visit Scheduling & Email/Calendar Integration**: Full MCP-powered implementation with:
    - **Multi-Provider Email Support**: Gmail, Outlook/Microsoft 365, and SendGrid integration with OAuth 2.0
    - **Multi-Provider Calendar Support**: Google Calendar and Outlook Calendar integration
    - **Automated Confirmations**: HTML email confirmations sent automatically with shelter details, what to bring, and visit information
